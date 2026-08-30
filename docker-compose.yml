@@ -1,0 +1,27 @@
+services:
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    environment:
+      GATEWAY_PORT: "8000"
+    ports:
+      - "8000:8000"
+    networks:
+      - pubtube-network
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+networks:
+  pubtube-network:
+    name: pubtube-network
