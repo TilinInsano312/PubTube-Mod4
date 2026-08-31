@@ -229,7 +229,18 @@ La trazabilidad principal debe vivir en:
 - documentacion;
 - reporte final.
 
-## 8. Reporte final
+## 8. Organizacion de agentes
+
+La implementacion operativa del ciclo se organiza en:
+
+- `core/`: estado del ciclo, fases, decisiones, validaciones y reporte.
+- `profiles/`: agentes disponibles y sus responsabilidades.
+- `skills/`: capacidades reutilizables por fase.
+- `orchestrator/`: asignacion de fase, agente y skill.
+- `harness/`: utilidades para iniciar una ejecucion, leer `docs/` y producir briefs.
+- `templates/`: formatos Markdown para tareas y reportes.
+
+## 9. Reporte final
 
 Al terminar una tarea, reporta de forma breve:
 
@@ -262,7 +273,7 @@ Pending:
 
 Incluye `NOT VERIFIED` cuando no exista evidencia suficiente.
 
-## 9. Protocolo ante fallos
+## 10. Protocolo ante fallos
 
 Cuando una validacion falle:
 
@@ -277,7 +288,7 @@ Next action: ...
 
 Cambia una hipotesis por vez y ejecuta la prueba minima. Si el mismo error aparece tres veces, detente, revisa el supuesto original e inspecciona configuracion o componentes relacionados.
 
-## 10. Definicion de Done
+## 11. Definicion de Done
 
 Una tarea esta `DONE` solo si:
 
