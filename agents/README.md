@@ -26,8 +26,7 @@ Antes de modificar el repositorio, el agente debe:
 4. Ejecutar la validacion mas barata que demuestre el cambio.
 5. Registrar cambios y limitaciones solo cuando aporten evidencia util.
 
-Para cambios que afecten contratos, eventos, observabilidad o stack tecnologico, revisar tambien:
+Para cambios que afecten contratos, eventos, observabilidad, documentacion de codigo o stack tecnologico, revisar tambien:
 
 - `docs/observability-plan-v01.md`
-- `docs/adr/ADR-0001-stack-tecnologico.md`
-
+- `docs/adr/*.md`

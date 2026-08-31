@@ -27,6 +27,8 @@ Aplica este orden de prioridad:
 6. Convenciones del repositorio.
 7. Supuestos minimos razonables.
 
+Dentro de la documentacion del proyecto, los ADR aceptados en `docs/adr/*.md` son decisiones vigentes y deben revisarse cuando la tarea toque su area.
+
 Si hay contradicciones, respeta la fuente de mayor prioridad y registra el conflicto en el reporte final.
 
 ## 3. Principios
@@ -181,7 +183,13 @@ Si el cambio requiere variables de entorno:
 
 ### Arquitectura
 
-Si el cambio altera stack tecnologico, mensajeria, persistencia, autenticacion o despliegue, crear o actualizar un ADR en `docs/adr/`.
+Antes de alterar stack tecnologico, mensajeria, persistencia, autenticacion, despliegue o convenciones transversales, revisar los ADR aceptados en `docs/adr/*.md`.
+
+Si el cambio introduce una decision arquitectonica nueva o reemplaza una decision vigente, crear o actualizar un ADR en `docs/adr/`.
+
+### Docstrings
+
+Si el cambio agrega o modifica docstrings Python, aplicar la convencion vigente definida en `docs/adr/ADR-0002-docstrings-convention.md`.
 
 ## 6. Tests
 
@@ -279,4 +287,3 @@ Una tarea esta `DONE` solo si:
 - el diff fue revisado;
 - no hay secretos ni cambios accidentales;
 - la respuesta final incluye cambios, evidencia y pendientes.
-
