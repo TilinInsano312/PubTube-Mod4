@@ -4,9 +4,9 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     environment:
-      GATEWAY_PORT: "8000"
+      GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
     ports:
-      - "8000:8000"
+      - "${GATEWAY_PORT:-8000}:${GATEWAY_PORT:-8000}"
     networks:
       - pubtube-network
     healthcheck:
@@ -15,8 +15,9 @@ services:
         - python
         - -c
         - >-
-          import urllib.request;
-          urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)
+          import os, urllib.request;
+          port = os.environ['GATEWAY_PORT'];
+          urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2)
       interval: 10s
       timeout: 3s
       retries: 5
