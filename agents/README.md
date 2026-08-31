@@ -20,7 +20,7 @@ Estandarizar como un agente debe analizar, implementar, verificar y reportar cam
 - [profiles/](profiles/): perfiles de agentes especializados.
 - [skills/](skills/): catalogo de capacidades reutilizables por fase.
 - [orchestrator/](orchestrator/): asignacion de fase, agente y skill.
-- [harness/](harness/): utilidades para preparar briefs y reportes desde Python.
+- [harness/](harness/): utilidades para preparar briefs, cargar `docs/` y reportes desde Python.
 - [templates/task-template.md](templates/task-template.md): plantilla para preparar una tarea antes de implementarla.
 - [templates/agent-report-template.md](templates/agent-report-template.md): plantilla de reporte compacto posterior a la ejecucion.
 
@@ -34,7 +34,7 @@ Antes de modificar el repositorio, el agente debe:
 4. Ejecutar la validacion mas barata que demuestre el cambio.
 5. Registrar cambios y limitaciones solo cuando aporten evidencia util.
 
-Para automatizar o estandarizar reportes, usar `AgentRun` desde `core/loop.py`.
+Para automatizar o estandarizar reportes, usar `AgentRun` desde `core/loop.py`. El arnes carga por defecto los Markdown de `docs/` y `docs/adr/` para incluirlos en el brief de analisis.
 
 Para cambios que afecten contratos, eventos, observabilidad, documentacion de codigo o stack tecnologico, revisar tambien:
 

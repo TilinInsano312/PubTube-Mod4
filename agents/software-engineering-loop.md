@@ -237,7 +237,7 @@ La implementacion operativa del ciclo se organiza en:
 - `profiles/`: agentes disponibles y sus responsabilidades.
 - `skills/`: capacidades reutilizables por fase.
 - `orchestrator/`: asignacion de fase, agente y skill.
-- `harness/`: utilidades para iniciar una ejecucion y producir briefs.
+- `harness/`: utilidades para iniciar una ejecucion, leer `docs/` y producir briefs.
 - `templates/`: formatos Markdown para tareas y reportes.
 
 ## 9. Reporte final

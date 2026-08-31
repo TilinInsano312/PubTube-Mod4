@@ -21,7 +21,7 @@ agents/
 | `profiles` | Declara los agentes disponibles: engineering, review, QA y documentacion. |
 | `skills` | Declara capacidades reutilizables: inspeccion, implementacion, validacion, revision y reporte. |
 | `orchestrator` | Determina que agente y skill corresponden a cada fase. |
-| `harness` | Prepara una ejecucion inicial y genera briefs o reportes desde Python. |
+| `harness` | Prepara una ejecucion inicial, carga contexto desde `docs/` y genera briefs o reportes desde Python. |
 | `templates` | Entrega formatos Markdown para uso manual por el equipo. |
 
 ## Default Flow
@@ -41,4 +41,4 @@ agents/
 - Agregar nuevas skills en `skills/catalog.py` y documentarlas en `skills/*.md`.
 - Cambiar el orden o asignacion de fases solo en `orchestrator/orchestrator.py`.
 - Mantener `agentic_loop.py` como compatibilidad para imports simples.
-
+- Mantener la carga de documentacion del proyecto en `harness/document_context.py`.

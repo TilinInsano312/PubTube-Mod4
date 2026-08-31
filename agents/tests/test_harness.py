@@ -17,9 +17,19 @@ def test_build_agent_run_numbers_acceptance_criteria() -> None:
 def test_render_run_brief_includes_next_agent_and_skill() -> None:
     run = build_agent_run(task="Preparar brief.", scope=["agents/"])
 
-    brief = render_run_brief(run)
+    brief = render_run_brief(run, include_docs=False)
 
     assert "Agent Run Brief" in brief
     assert "Software Engineering Agent" in brief
     assert "Repository Inspection" in brief
     assert "`agents/`" in brief
+
+
+def test_render_run_brief_includes_project_docs_by_default() -> None:
+    run = build_agent_run(task="Leer documentacion.")
+
+    brief = render_run_brief(run)
+
+    assert "## Project Documentation Context" in brief
+    assert "`docs/adr/ADR-0001-stack-tecnologico.md`" in brief
+    assert "`docs/observability-plan-v01.md`" in brief
