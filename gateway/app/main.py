@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from .api.router import api_router
 from .core.config import settings
 from .middleware.correlation_id import CorrelationIdMiddleware
+from .middleware.jwt_auth import JWTAuthenticationMiddleware
 
 
 app = FastAPI(
@@ -14,6 +15,8 @@ app = FastAPI(
 )
 
 
+# Keep correlation IDs on authentication failures as well as successful responses.
+app.add_middleware(JWTAuthenticationMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.include_router(api_router)
 
