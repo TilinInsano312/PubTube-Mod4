@@ -10,3 +10,6 @@ venv/
 # Local environment variables
 .env
 !.env.example
+
+# Graphify generated reports, graphs, caches and intermediate files
+graphify-out/
