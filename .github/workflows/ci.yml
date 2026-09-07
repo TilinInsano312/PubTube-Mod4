@@ -12,6 +12,8 @@ jobs:
   python:
     name: Lint, test and build
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/gateway
     defaults:
       run:
         working-directory: gateway
