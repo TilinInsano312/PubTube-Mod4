@@ -30,6 +30,27 @@ class Settings(BaseSettings):
         validation_alias="MODULE3_URL",
     )
 
+    upstream_connect_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        validation_alias="UPSTREAM_CONNECT_TIMEOUT_SECONDS",
+    )
+    upstream_read_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias="UPSTREAM_READ_TIMEOUT_SECONDS",
+    )
+    upstream_write_timeout_seconds: float = Field(
+        default=300.0,
+        gt=0,
+        validation_alias="UPSTREAM_WRITE_TIMEOUT_SECONDS",
+    )
+    upstream_pool_timeout_seconds: float = Field(
+        default=5.0,
+        gt=0,
+        validation_alias="UPSTREAM_POOL_TIMEOUT_SECONDS",
+    )
+
     jwt_secret: str = Field(default="", validation_alias="JWT_SECRET")
     jwt_algorithm: str = Field(
         default="HS256",
