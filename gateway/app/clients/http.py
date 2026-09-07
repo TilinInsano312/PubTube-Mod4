@@ -1,6 +1,6 @@
 """HTTP client abstraction for controlled upstream module calls."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import httpx
@@ -24,6 +24,8 @@ HOP_BY_HOP_HEADERS = frozenset(
         "upgrade",
     }
 )
+QueryParamValue = str | int | float | None
+QueryParams = Mapping[str, QueryParamValue] | Sequence[tuple[str, QueryParamValue]]
 
 
 def build_forward_headers(
@@ -102,10 +104,11 @@ class UpstreamHttpClient:
         path: str,
         *,
         headers: Mapping[str, str] | None = None,
-        params: Mapping[str, str | int | float | None] | None = None,
+        params: QueryParams | None = None,
         content: bytes | None = None,
         json: Any = None,
         correlation_id: str | None = None,
+        raise_for_status: bool = True,
     ) -> httpx.Response:
         """Execute an asynchronous request against the configured module.
 
@@ -117,6 +120,9 @@ class UpstreamHttpClient:
             content: Optional raw request body.
             json: Optional JSON request body.
             correlation_id: Application correlation ID to propagate.
+            raise_for_status: Whether to map upstream 4xx/5xx responses to an
+                ``UpstreamHTTPError``. Gateway proxy routes disable this to
+                preserve the upstream response contract.
 
         Returns:
             The successful upstream response.
@@ -142,7 +148,7 @@ class UpstreamHttpClient:
         except httpx.RequestError as exc:
             raise UpstreamUnavailableError(self.module) from exc
 
-        if response.is_error:
+        if raise_for_status and response.is_error:
             raise UpstreamHTTPError(self.module, response.status_code)
 
         return response
