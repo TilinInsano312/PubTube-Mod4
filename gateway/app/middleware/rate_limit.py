@@ -102,9 +102,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.excluded_paths = frozenset(excluded_paths)
         self.limiter = InMemoryRateLimiter(
             max_requests=(
-                settings.rate_limit_requests
-                if max_requests is None
-                else max_requests
+                settings.rate_limit_requests if max_requests is None else max_requests
             ),
             window_seconds=(
                 settings.rate_limit_window_seconds

@@ -51,9 +51,7 @@ def build_forward_headers(
     for name, value in incoming_headers.items():
         if name.lower() == "connection":
             hop_by_hop_headers.update(
-                token.strip().lower()
-                for token in value.split(",")
-                if token.strip()
+                token.strip().lower() for token in value.split(",") if token.strip()
             )
 
     forwarded: dict[str, str] = {}
