@@ -5,11 +5,17 @@ import jwt
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from app.core.config import settings
 from app.middleware.correlation_id import CorrelationIdMiddleware
 from app.middleware.jwt_auth import JWTAuthenticationMiddleware
-from app.middleware.rate_limit import InMemoryRateLimiter, RateLimitMiddleware
+from app.middleware.rate_limit import (
+    InMemoryRateLimiter,
+    RateLimitMiddleware,
+    _client_key,
+    _parse_trusted_proxy_ips,
+)
 
 
 JWT_SECRET = "test-only-rate-limit-secret-123456789"
@@ -37,6 +43,21 @@ def create_token() -> str:
         "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def build_request(client_host: str, real_ip: str) -> Request:
+    """Build a request with an explicit peer and X-Real-IP header."""
+
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/protected",
+            "query_string": b"",
+            "headers": [(b"x-real-ip", real_ip.encode())],
+            "client": (client_host, 1234),
+        }
+    )
 
 
 @pytest.fixture
@@ -155,3 +176,16 @@ def test_rate_limit_does_not_bypass_jwt_authentication(
 
     assert unauthorized.status_code == 401
     assert authorized.status_code == 200
+
+
+def test_untrusted_peer_cannot_override_rate_limit_identity() -> None:
+    request = build_request("10.0.0.5", "203.0.113.7")
+
+    assert _client_key(request, _parse_trusted_proxy_ips("")) == "10.0.0.5"
+
+
+def test_trusted_proxy_may_supply_rate_limit_identity() -> None:
+    request = build_request("10.0.0.5", "203.0.113.7")
+    trusted_networks = _parse_trusted_proxy_ips("10.0.0.0/8")
+
+    assert _client_key(request, trusted_networks) == "203.0.113.7"

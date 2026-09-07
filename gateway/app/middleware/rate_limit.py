@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
+from ipaddress import IPv4Network, IPv6Network, ip_address, ip_network
 from math import ceil
 from threading import Lock
 from time import monotonic
@@ -15,6 +16,7 @@ from ..core.config import settings
 
 
 RATE_LIMIT_EXCLUDED_PATHS = frozenset({"/api/health", "/api/health/"})
+TrustedProxyNetwork = IPv4Network | IPv6Network
 
 
 @dataclass(frozen=True)
@@ -96,10 +98,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         max_requests: int | None = None,
         window_seconds: float | None = None,
         excluded_paths: Collection[str] = RATE_LIMIT_EXCLUDED_PATHS,
+        trusted_proxy_ips: str | Collection[str] | None = None,
         clock: Callable[[], float] = monotonic,
     ) -> None:
         super().__init__(app)
         self.excluded_paths = frozenset(excluded_paths)
+        self.trusted_proxy_networks = _parse_trusted_proxy_ips(
+            settings.trusted_proxy_ips
+            if trusted_proxy_ips is None
+            else trusted_proxy_ips
+        )
         self.limiter = InMemoryRateLimiter(
             max_requests=(
                 settings.rate_limit_requests if max_requests is None else max_requests
@@ -122,7 +130,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.excluded_paths:
             return await call_next(request)
 
-        decision = self.limiter.check(_client_key(request))
+        decision = self.limiter.check(_client_key(request, self.trusted_proxy_networks))
         headers = {
             "X-RateLimit-Limit": str(decision.limit),
             "X-RateLimit-Remaining": str(decision.remaining),
@@ -142,14 +150,55 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _client_key(request: Request) -> str:
-    """Return the client identity supplied by the trusted edge when present."""
+def _parse_trusted_proxy_ips(
+    value: str | Collection[str],
+) -> tuple[TrustedProxyNetwork, ...]:
+    """Parse trusted proxy IPs or CIDRs from configuration."""
 
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip and real_ip.strip():
-        return real_ip.strip()
+    entries = value.split(",") if isinstance(value, str) else value
+    networks: list[TrustedProxyNetwork] = []
+    for entry in entries:
+        normalized_entry = entry.strip()
+        if not normalized_entry:
+            continue
+        try:
+            networks.append(ip_network(normalized_entry, strict=False))
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid trusted proxy IP or network: {normalized_entry}"
+            ) from exc
+    return tuple(networks)
 
-    if request.client is not None and request.client.host:
-        return request.client.host
+
+def _client_key(
+    request: Request,
+    trusted_proxy_networks: Collection[TrustedProxyNetwork],
+) -> str:
+    """Return a client identity without trusting spoofable proxy headers."""
+
+    client_host = request.client.host if request.client is not None else None
+    if client_host and _is_trusted_proxy(client_host, trusted_proxy_networks):
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            try:
+                return str(ip_address(real_ip.strip()))
+            except ValueError:
+                pass
+
+    if client_host:
+        return client_host
 
     return "unknown"
+
+
+def _is_trusted_proxy(
+    client_host: str,
+    trusted_proxy_networks: Collection[TrustedProxyNetwork],
+) -> bool:
+    """Check whether a peer IP is allowed to provide ``X-Real-IP``."""
+
+    try:
+        client_address = ip_address(client_host)
+    except ValueError:
+        return False
+    return any(client_address in network for network in trusted_proxy_networks)

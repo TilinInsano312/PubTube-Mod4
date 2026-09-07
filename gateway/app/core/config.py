@@ -70,6 +70,10 @@ class Settings(BaseSettings):
         gt=0,
         validation_alias="RATE_LIMIT_WINDOW_SECONDS",
     )
+    trusted_proxy_ips: str = Field(
+        default="",
+        validation_alias="TRUSTED_PROXY_IPS",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
