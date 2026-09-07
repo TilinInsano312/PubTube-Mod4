@@ -51,6 +51,17 @@ def routing_client(
                 headers={"X-Upstream-Error": "true"},
                 request=request,
             )
+        if request.url.params.get("failure") == "cookies":
+            return httpx.Response(
+                200,
+                content=b'{"accepted":true}',
+                headers=[
+                    ("Set-Cookie", "session=first; Path=/"),
+                    ("Set-Cookie", "session=second; Path=/"),
+                    ("X-Upstream", "repeated"),
+                ],
+                request=request,
+            )
         return httpx.Response(
             201 if request.url.path == "/content" and request.method == "POST" else 200,
             content=b'{"accepted":true}',
@@ -168,6 +179,24 @@ def test_upstream_status_body_and_headers_are_propagated(
     assert response.content == b'{"detail":"module unavailable"}'
     assert response.headers["X-Upstream-Error"] == "true"
     assert len(observed) == 1
+
+
+def test_repeated_upstream_headers_are_preserved(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, _ = routing_client
+
+    response = client.get(
+        "/api/events/correlation-123?failure=cookies",
+        headers={"Authorization": f"Bearer {create_token()}"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get_list("set-cookie") == [
+        "session=first; Path=/",
+        "session=second; Path=/",
+    ]
+    assert response.headers.get_list("content-length") == [str(len(response.content))]
 
 
 def test_unavailable_upstream_returns_gateway_error(

@@ -1,5 +1,6 @@
 """Shared helpers for forwarding Gateway requests to internal modules."""
 
+from collections.abc import Sequence
 from urllib.parse import quote
 
 import httpx
@@ -76,18 +77,43 @@ async def proxy_request(
 
 
 def _response_from_upstream(upstream_response: httpx.Response) -> Response:
-    """Convert an HTTPX response into a safe FastAPI response."""
+    """Convert an HTTPX response into a safe FastAPI response.
 
-    headers = {
-        name: value
-        for name, value in upstream_response.headers.items()
-        if name.lower() not in HOP_BY_HOP_HEADERS
-    }
-    return Response(
+    HTTPX exposes response headers both as a mapping and as raw pairs. The
+    mapping collapses repeated fields such as ``Set-Cookie``, so the raw form
+    is required when forwarding the response contract.
+    """
+
+    response = Response(
         content=upstream_response.content,
         status_code=upstream_response.status_code,
-        headers=headers,
     )
+    raw_headers = upstream_response.headers.raw
+    hop_by_hop_headers = _hop_by_hop_header_names(raw_headers)
+    response.raw_headers = [
+        *response.raw_headers,
+        *[
+            (name, value)
+            for name, value in raw_headers
+            if name.lower() not in hop_by_hop_headers
+            and name.lower() != b"content-length"
+        ],
+    ]
+    return response
+
+
+def _hop_by_hop_header_names(
+    raw_headers: Sequence[tuple[bytes, bytes]],
+) -> set[bytes]:
+    """Return hop-by-hop response header names, including nominated fields."""
+
+    hop_by_hop_headers = {name.encode("ascii") for name in HOP_BY_HOP_HEADERS}
+    for name, value in raw_headers:
+        if name.lower() == b"connection":
+            hop_by_hop_headers.update(
+                token.strip().lower() for token in value.split(b",") if token.strip()
+            )
+    return hop_by_hop_headers
 
 
 def _upstream_error_response(error: UpstreamError, *, status_code: int) -> JSONResponse:
