@@ -47,6 +47,11 @@ internas.
 
 ### Rate limiting
 
+`TRUSTED_PROXY_IPS` configura una lista separada por comas de IPs o CIDRs de
+proxies autorizados. `X-Real-IP` solo se considera cuando el peer pertenece a
+esa lista y su valor es una IP valida; si la lista esta vacia, se usa siempre la
+IP de conexion observada por FastAPI.
+
 El límite se aplica en el middleware del Gateway, después de la correlación y
 antes de la autenticación JWT. Se usa una ventana fija en memoria por proceso,
 sin agregar Redis u otra infraestructura.

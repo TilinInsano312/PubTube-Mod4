@@ -13,6 +13,10 @@ variables del entrypoint oficial de la imagen NGINX.
 
 ## Responsabilidad de esta capa
 
+Si NGINX envia `X-Real-IP`, el Gateway debe tener `TRUSTED_PROXY_IPS` con la IP
+o CIDR de los peers de NGINX. Sin esa allowlist, el Gateway ignora el header y
+limita usando la IP de conexion directa.
+
 - Recibir tráfico HTTP externo.
 - Reenviar `/api/...` al Gateway FastAPI.
 - Preservar headers de proxy y `X-Correlation-Id` cuando exista.
