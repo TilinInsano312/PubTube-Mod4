@@ -1,6 +1,6 @@
 """Centralized settings for the PubTube API Gateway."""
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -55,6 +55,20 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(
         default="HS256",
         validation_alias="JWT_ALGORITHM",
+    )
+
+    rate_limit_requests: int = Field(
+        default=60,
+        ge=1,
+        validation_alias=AliasChoices(
+            "RATE_LIMIT_REQUESTS",
+            "RATE_LIMIT_MAX_REQUESTS",
+        ),
+    )
+    rate_limit_window_seconds: float = Field(
+        default=60.0,
+        gt=0,
+        validation_alias="RATE_LIMIT_WINDOW_SECONDS",
     )
 
     model_config = SettingsConfigDict(
