@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     environment:
       GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
+      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
     ports:
       - "${GATEWAY_PORT:-8000}:${GATEWAY_PORT:-8000}"
     networks:
