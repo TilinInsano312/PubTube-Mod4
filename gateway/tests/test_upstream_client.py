@@ -38,6 +38,20 @@ def test_build_forward_headers_filters_hop_by_hop_headers() -> None:
     assert headers["X-Correlation-Id"] == "application-id"
 
 
+def test_build_forward_headers_filters_headers_named_by_connection() -> None:
+    headers = build_forward_headers(
+        {
+            "Connection": "keep-alive, X-Internal-Header, Upgrade",
+            "x-internal-header": "must-not-cross-proxy",
+            "X-End-To-End": "keep-me",
+        }
+    )
+
+    assert "Connection" not in headers
+    assert "x-internal-header" not in headers
+    assert "X-End-To-End" in headers
+
+
 def test_client_builds_explicit_relative_upstream_url_and_propagates_headers() -> None:
     observed: dict[str, str] = {}
 

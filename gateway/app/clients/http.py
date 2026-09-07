@@ -41,10 +41,23 @@ def build_forward_headers(
         Headers safe to pass to an upstream HTTP request.
     """
 
+    incoming_headers = headers or {}
+    hop_by_hop_headers = set(HOP_BY_HOP_HEADERS)
+
+    # RFC 9110 allows Connection to nominate additional hop-by-hop fields.
+    # Those fields must not cross the proxy boundary either.
+    for name, value in incoming_headers.items():
+        if name.lower() == "connection":
+            hop_by_hop_headers.update(
+                token.strip().lower()
+                for token in value.split(",")
+                if token.strip()
+            )
+
     forwarded: dict[str, str] = {}
-    for name, value in (headers or {}).items():
+    for name, value in incoming_headers.items():
         normalized_name = name.lower()
-        if normalized_name in HOP_BY_HOP_HEADERS or normalized_name == "host":
+        if normalized_name in hop_by_hop_headers or normalized_name == "host":
             continue
         forwarded[name] = value
 
