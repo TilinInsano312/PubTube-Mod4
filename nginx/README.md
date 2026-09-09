@@ -13,15 +13,25 @@ variables del entrypoint oficial de la imagen NGINX.
 
 ## Responsabilidad de esta capa
 
+Si NGINX envia `X-Real-IP`, el Gateway debe tener `TRUSTED_PROXY_IPS` con la IP
+o CIDR de los peers de NGINX. Sin esa allowlist, el Gateway ignora el header y
+limita usando la IP de conexion directa.
+
 - Recibir tráfico HTTP externo.
 - Reenviar `/api/...` al Gateway FastAPI.
 - Preservar headers de proxy y `X-Correlation-Id` cuando exista.
 - Preparar HTTP/1.1, WebSocket/SSE y cargas grandes.
 - Mantener rutas no declaradas fuera del backend con respuesta 404.
 
-La generación del UUID v4 de dominio, JWT, autorización, agregación de
-respuestas, métricas y contratos BFF continúan siendo responsabilidad de
-FastAPI o de subtareas posteriores.
+El routing por módulo, la validación JWT, el rate limiting, la autorización,
+la agregación de respuestas y los contratos BFF son responsabilidad de FastAPI.
+NGINX no duplica esas reglas: únicamente reenvía la solicitud al Gateway y
+preserva los headers de proxy necesarios, incluido `X-Real-IP` para el límite
+por cliente.
+
+El Gateway expone las rutas públicas de M1, M2 y M3 descritas en
+`docs/adr/ADR-0005-gateway-routing-rate-limiting.md`. `/api/health` se resuelve
+localmente en FastAPI y permanece excluido del rate limiting.
 
 ## Integración pendiente de Docker
 

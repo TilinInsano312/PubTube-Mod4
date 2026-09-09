@@ -85,6 +85,25 @@ def test_client_builds_explicit_relative_upstream_url_and_propagates_headers() -
     }
 
 
+def test_client_can_return_upstream_error_response_for_proxy_routes() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "missing"}, request=request)
+
+    async_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = UpstreamHttpClient(
+        module="module1",
+        base_url="http://module-one.test",
+        client=async_client,
+        timeout=TIMEOUT,
+    )
+
+    response = run(client.request("GET", "/content/missing", raise_for_status=False))
+    run(async_client.aclose())
+
+    assert response.status_code == 404  # type: ignore[union-attr]
+    assert response.json() == {"detail": "missing"}  # type: ignore[union-attr]
+
+
 def test_client_rejects_absolute_or_non_rooted_paths() -> None:
     async_client = httpx.AsyncClient()
     client = UpstreamHttpClient(

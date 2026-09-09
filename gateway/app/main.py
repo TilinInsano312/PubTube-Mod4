@@ -7,6 +7,7 @@ from .core.config import settings
 from .core.lifespan import lifespan
 from .middleware.correlation_id import CorrelationIdMiddleware
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
+from .middleware.rate_limit import RateLimitMiddleware
 
 app = FastAPI(
     title=settings.app_name,
@@ -18,6 +19,8 @@ app = FastAPI(
 
 # Keep correlation IDs on authentication failures as well as successful responses.
 app.add_middleware(JWTAuthenticationMiddleware)
+# Apply the limit before authentication while keeping correlation IDs outermost.
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.include_router(api_router)
 
