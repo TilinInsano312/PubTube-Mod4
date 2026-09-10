@@ -12,24 +12,19 @@ La ruta está protegida automáticamente por `JWTAuthenticationMiddleware`. Sin 
 responde `401 Unauthorized`; con un JWT válido, devuelve `200` y muestra los claims
 que el middleware dejó disponibles para la ruta.
 
-Para probarla localmente, configura un secreto compartido:
+La demostración completa se puede ejecutar con un solo comando desde la raíz del
+repositorio:
 
 ```bash
-export JWT_SECRET='demo-secret-for-local-testing-only'
-docker compose up --build gateway
+bash scripts/demo-auth.sh
 ```
 
-Genera un token de prueba usando el mismo secreto y algoritmo:
+El script levanta el Gateway, genera un JWT efímero dentro del contenedor y muestra
+automáticamente los casos de ruta pública, solicitud sin token, token inválido y token
+válido. También acepta un secreto propio si se desea:
 
 ```bash
-TOKEN=$(docker run --rm pubtube-mod4-gateway:latest python -c "from datetime import datetime, timedelta, timezone; import jwt; print(jwt.encode({'sub':'user-123','user_id':'account-456','role':'editor','exp':datetime.now(timezone.utc)+timedelta(minutes=5)}, 'demo-secret-for-local-testing-only', algorithm='HS256'))")
-```
-
-Luego compara ambas respuestas:
-
-```bash
-curl -i http://localhost:8000/api/demo/protected
-curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/demo/protected
+JWT_SECRET='mi-secreto-local' bash scripts/demo-auth.sh
 ```
 
 El endpoint es únicamente de demostración y no debe mantenerse como una ruta de negocio
