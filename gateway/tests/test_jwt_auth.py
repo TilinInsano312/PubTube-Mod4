@@ -148,3 +148,33 @@ def test_valid_jwt_reaches_gateway_router() -> None:
     # The current Gateway has no module proxy registered, so a valid request
     # reaches FastAPI routing and receives its normal not-found response.
     assert response.status_code == 404
+
+
+def test_demo_endpoint_requires_jwt() -> None:
+    response = TestClient(app).get("/api/demo/protected")
+
+    assert response.status_code == 401
+
+
+def test_demo_endpoint_returns_validated_identity() -> None:
+    token = create_token(user_id="account-456", role="editor")
+
+    response = TestClient(app).get(
+        "/api/demo/protected",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "authenticated": True,
+        "message": "JWT válido; el middleware autenticó la solicitud",
+        "user_id": "account-456",
+        "role": "editor",
+        "claims": {
+            "sub": "user-123",
+            "role": "editor",
+            "user_id": "account-456",
+            "exp": body["claims"]["exp"],
+        },
+    }
