@@ -1,6 +1,6 @@
 """HTTP client abstraction for controlled upstream module calls."""
 
-from collections.abc import Mapping
+from collections.abc import AsyncIterable, Mapping, Sequence
 from typing import Any
 
 import httpx
@@ -24,6 +24,9 @@ HOP_BY_HOP_HEADERS = frozenset(
         "upgrade",
     }
 )
+QueryParamValue = str | int | float | None
+QueryParams = Mapping[str, QueryParamValue] | Sequence[tuple[str, QueryParamValue]]
+RequestContent = bytes | AsyncIterable[bytes]
 
 
 def build_forward_headers(
@@ -49,9 +52,7 @@ def build_forward_headers(
     for name, value in incoming_headers.items():
         if name.lower() == "connection":
             hop_by_hop_headers.update(
-                token.strip().lower()
-                for token in value.split(",")
-                if token.strip()
+                token.strip().lower() for token in value.split(",") if token.strip()
             )
 
     forwarded: dict[str, str] = {}
@@ -102,10 +103,11 @@ class UpstreamHttpClient:
         path: str,
         *,
         headers: Mapping[str, str] | None = None,
-        params: Mapping[str, str | int | float | None] | None = None,
-        content: bytes | None = None,
+        params: QueryParams | None = None,
+        content: RequestContent | None = None,
         json: Any = None,
         correlation_id: str | None = None,
+        raise_for_status: bool = True,
     ) -> httpx.Response:
         """Execute an asynchronous request against the configured module.
 
@@ -114,9 +116,12 @@ class UpstreamHttpClient:
             path: Relative path explicitly selected by a future BFF service.
             headers: End-to-end request headers to forward.
             params: Query parameters for the upstream request.
-            content: Optional raw request body.
+            content: Optional raw request body or asynchronous byte stream.
             json: Optional JSON request body.
             correlation_id: Application correlation ID to propagate.
+            raise_for_status: Whether to map upstream 4xx/5xx responses to an
+                ``UpstreamHTTPError``. Gateway proxy routes disable this to
+                preserve the upstream response contract.
 
         Returns:
             The successful upstream response.
@@ -142,7 +147,7 @@ class UpstreamHttpClient:
         except httpx.RequestError as exc:
             raise UpstreamUnavailableError(self.module) from exc
 
-        if response.is_error:
+        if raise_for_status and response.is_error:
             raise UpstreamHTTPError(self.module, response.status_code)
 
         return response

@@ -73,3 +73,12 @@ redes, servicios ni volúmenes.
 
 JWT completo, RBAC, rate limiting, métricas Prometheus, OpenTelemetry, TLS,
 WAF, caching, balanceo múltiple e integración real con módulos internos.
+
+## Evolución de alcance
+
+La restricción sobre rate limiting y routing hacia módulos correspondía al
+estado del repositorio cuando aún no estaban disponibles los contratos y URLs
+definitivas. La decisión posterior para `US-D1.T3` está documentada en
+[ADR-0005 — Routing por módulo y rate limiting en el Gateway](ADR-0005-gateway-routing-rate-limiting.md),
+que complementa esta separación de responsabilidades sin trasladar lógica al
+NGINX.
