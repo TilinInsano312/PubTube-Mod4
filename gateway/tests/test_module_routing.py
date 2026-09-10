@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 import httpx
 import jwt
@@ -41,9 +42,19 @@ def routing_client(
     observed: list[httpx.Request] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        await request.aread()
         observed.append(request)
         if request.url.params.get("failure") == "connect":
             raise httpx.ConnectError("module unavailable", request=request)
+        if request.url.params.get("failure") == "timeout":
+            raise httpx.ReadTimeout("module timed out", request=request)
+        if request.url.params.get("failure") == "validation":
+            return httpx.Response(
+                422,
+                content=b'{"detail":"invalid content"}',
+                headers={"X-Upstream-Error": "validation"},
+                request=request,
+            )
         if request.url.params.get("failure") == "status":
             return httpx.Response(
                 503,
@@ -63,7 +74,9 @@ def routing_client(
                 request=request,
             )
         return httpx.Response(
-            201 if request.url.path == "/content" and request.method == "POST" else 200,
+            201
+            if request.url.path == "/api/content" and request.method == "POST"
+            else 200,
             content=b'{"accepted":true}',
             headers={"Content-Type": "application/json", "X-Upstream": "stub"},
             request=request,
@@ -88,16 +101,20 @@ def routing_client(
 @pytest.mark.parametrize(
     ("method", "path", "expected_url"),
     [
-        ("POST", "/api/content?draft=true", "http://module1.test/content?draft=true"),
+        (
+            "POST",
+            "/api/content?draft=true",
+            "http://module1.test/api/content?draft=true",
+        ),
         (
             "PUT",
             "/api/content/content-123/metadata?lang=es",
-            "http://module1.test/content/content-123/metadata?lang=es",
+            "http://module1.test/api/content/content-123/metadata?lang=es",
         ),
         (
             "GET",
             "/api/content/videos/nested?tag=a&tag=b",
-            "http://module1.test/content/videos/nested?tag=a&tag=b",
+            "http://module1.test/api/content/videos/nested?tag=a&tag=b",
         ),
         (
             "GET",
@@ -158,11 +175,44 @@ def test_module_route_preserves_request_body(
     response = client.put(
         "/api/content/content-123/metadata",
         content=body,
-        headers={"Authorization": f"Bearer {create_token()}"},
+        headers={
+            "Authorization": f"Bearer {create_token()}",
+            "Content-Type": "application/json",
+        },
     )
 
     assert response.status_code == 200
     assert observed[0].content == body
+    assert observed[0].headers["Content-Type"] == "application/json"
+
+
+def test_module1_multipart_body_and_headers_are_forwarded(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, observed = routing_client
+
+    response = client.post(
+        "/api/content",
+        data={"title": "Video de prueba"},
+        files={
+            "file": ("video.mp4", b"video-content", "video/mp4"),
+            "thumbnail": ("thumbnail.jpg", b"thumbnail-content", "image/jpeg"),
+        },
+        headers={
+            "Authorization": f"Bearer {create_token()}",
+            "X-Correlation-Id": "multipart-correlation-id",
+        },
+    )
+
+    assert response.status_code == 201
+    forwarded = observed[0]
+    assert forwarded.url.path == "/api/content"
+    assert forwarded.headers["Content-Type"].startswith("multipart/form-data;")
+    assert b'name="file"' in forwarded.content
+    assert b"video-content" in forwarded.content
+    assert b'name="thumbnail"' in forwarded.content
+    assert b"thumbnail-content" in forwarded.content
+    assert forwarded.headers["X-Correlation-Id"] == "multipart-correlation-id"
 
 
 def test_upstream_status_body_and_headers_are_propagated(
@@ -215,6 +265,72 @@ def test_unavailable_upstream_returns_gateway_error(
         "code": "UPSTREAM_UNAVAILABLE",
         "module": "module2",
     }
+
+
+def test_module1_unavailable_upstream_returns_gateway_error(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, _ = routing_client
+
+    response = client.get(
+        "/api/content?failure=connect",
+        headers={"Authorization": f"Bearer {create_token()}"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "Upstream module unavailable: module1",
+        "code": "UPSTREAM_UNAVAILABLE",
+        "module": "module1",
+    }
+
+
+def test_module1_timeout_returns_gateway_error(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, _ = routing_client
+
+    response = client.get(
+        "/api/content?failure=timeout",
+        headers={"Authorization": f"Bearer {create_token()}"},
+    )
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "detail": "Upstream module timed out: module1",
+        "code": "UPSTREAM_TIMEOUT",
+        "module": "module1",
+    }
+
+
+def test_module1_client_error_is_preserved(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, _ = routing_client
+
+    response = client.get(
+        "/api/content?failure=validation",
+        headers={"Authorization": f"Bearer {create_token()}"},
+    )
+
+    assert response.status_code == 422
+    assert response.content == b'{"detail":"invalid content"}'
+    assert response.headers["X-Upstream-Error"] == "validation"
+
+
+def test_module1_generates_and_propagates_correlation_id(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, observed = routing_client
+
+    response = client.get(
+        "/api/content",
+        headers={"Authorization": f"Bearer {create_token()}"},
+    )
+
+    correlation_id = response.headers["X-Correlation-Id"]
+    UUID(correlation_id)
+    assert observed[0].headers["X-Correlation-Id"] == correlation_id
 
 
 def test_module_route_requires_jwt_before_calling_upstream(
