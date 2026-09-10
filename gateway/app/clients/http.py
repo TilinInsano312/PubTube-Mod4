@@ -1,6 +1,6 @@
 """HTTP client abstraction for controlled upstream module calls."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterable, Mapping, Sequence
 from typing import Any
 
 import httpx
@@ -26,6 +26,7 @@ HOP_BY_HOP_HEADERS = frozenset(
 )
 QueryParamValue = str | int | float | None
 QueryParams = Mapping[str, QueryParamValue] | Sequence[tuple[str, QueryParamValue]]
+RequestContent = bytes | AsyncIterable[bytes]
 
 
 def build_forward_headers(
@@ -103,7 +104,7 @@ class UpstreamHttpClient:
         *,
         headers: Mapping[str, str] | None = None,
         params: QueryParams | None = None,
-        content: bytes | None = None,
+        content: RequestContent | None = None,
         json: Any = None,
         correlation_id: str | None = None,
         raise_for_status: bool = True,
@@ -115,7 +116,7 @@ class UpstreamHttpClient:
             path: Relative path explicitly selected by a future BFF service.
             headers: End-to-end request headers to forward.
             params: Query parameters for the upstream request.
-            content: Optional raw request body.
+            content: Optional raw request body or asynchronous byte stream.
             json: Optional JSON request body.
             correlation_id: Application correlation ID to propagate.
             raise_for_status: Whether to map upstream 4xx/5xx responses to an

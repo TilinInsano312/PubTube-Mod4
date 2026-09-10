@@ -22,7 +22,7 @@ async def create_content(
         request,
         upstream_service,
         UpstreamModule.MODULE1,
-        "/content",
+        "/api/content",
     )
 
 
@@ -34,7 +34,7 @@ async def update_content_metadata(
 ) -> Response:
     """Forward metadata updates to Module 1."""
 
-    path = f"/content/{quote_path_segment(content_id)}/metadata"
+    path = f"/api/content/{quote_path_segment(content_id)}/metadata"
     return await proxy_request(request, upstream_service, UpstreamModule.MODULE1, path)
 
 
@@ -49,7 +49,7 @@ async def list_content(
         request,
         upstream_service,
         UpstreamModule.MODULE1,
-        "/content",
+        "/api/content",
     )
 
 
@@ -61,7 +61,7 @@ async def get_content(
 ) -> Response:
     """Forward content paths below the Module 1 collection."""
 
-    path = "/content"
+    path = "/api/content"
     if content_path:
-        path = f"/content/{quote_nested_path(content_path)}"
+        path = f"/api/content/{quote_nested_path(content_path)}"
     return await proxy_request(request, upstream_service, UpstreamModule.MODULE1, path)

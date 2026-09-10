@@ -53,7 +53,9 @@ async def proxy_request(
             path=path,
             headers=request.headers,
             params=list(request.query_params.multi_items()),
-            content=await request.body(),
+            # Keep uploads as an async stream so multipart video bodies are
+            # not materialized in the Gateway process before forwarding.
+            content=request.stream(),
             correlation_id=getattr(request.state, "correlation_id", None),
             raise_for_status=False,
         )
