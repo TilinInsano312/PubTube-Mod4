@@ -40,6 +40,10 @@ Las URLs base se seleccionan desde `MODULE1_URL`, `MODULE2_URL` y
 interna, y los parámetros de consulta se envían como pares para conservar
 valores repetidos.
 
+`MODULE1_URL` representa el origen del servicio, sin el prefijo de la API. El
+Gateway conserva el prefijo contractual `/api/content` al construir las
+llamadas hacia M1.
+
 Las respuestas 2xx, 3xx y 4xx/5xx del upstream se devuelven al cliente con su
 status, body y headers de extremo a extremo. Los errores de conexión se
 normalizan como `502`, los timeouts como `504` y no se exponen excepciones
