@@ -18,6 +18,8 @@ PUBLIC_PATHS = frozenset(
         "/docs/oauth2-redirect",
         "/redoc",
         "/openapi.json",
+        "/metrics",
+        "/metrics/",
     }
 )
 UNAUTHORIZED_DETAIL = "Invalid authentication credentials"

@@ -15,7 +15,9 @@ from starlette.types import ASGIApp
 from ..core.config import settings
 
 
-RATE_LIMIT_EXCLUDED_PATHS = frozenset({"/api/health", "/api/health/"})
+RATE_LIMIT_EXCLUDED_PATHS = frozenset(
+    {"/api/health", "/api/health/", "/metrics", "/metrics/"}
+)
 TrustedProxyNetwork = IPv4Network | IPv6Network
 
 

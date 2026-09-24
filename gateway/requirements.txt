@@ -3,3 +3,4 @@ uvicorn[standard]>=0.23,<1.0
 pydantic-settings>=2.0,<3.0
 PyJWT>=2.8,<3.0
 httpx>=0.24,<1.0
+prometheus-client>=0.20,<1.0

@@ -4,14 +4,14 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     environment:
-      GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
+      GATEWAY_PORT: "8000"
       JWT_SECRET: "${JWT_SECRET:-}"
       JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
       RATE_LIMIT_REQUESTS: "${RATE_LIMIT_REQUESTS:-60}"
       RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-60}"
       TRUSTED_PROXY_IPS: "${TRUSTED_PROXY_IPS:-}"
     ports:
-      - "${GATEWAY_PORT:-8000}:${GATEWAY_PORT:-8000}"
+      - "${GATEWAY_PORT:-8000}:8000"
     networks:
       - pubtube-network
     healthcheck:
@@ -27,6 +27,17 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - pubtube-network
 
 networks:
   pubtube-network:
