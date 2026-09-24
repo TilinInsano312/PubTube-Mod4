@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   pull_request:
 
 permissions:
@@ -50,6 +50,9 @@ jobs:
 
       - name: Validate Docker Compose
         run: docker compose config --quiet
+
+      - name: Validate Docker Compose with alternate gateway port
+        run: GATEWAY_PORT=8010 docker compose config --quiet
 
       - name: Build gateway image
         run: docker build --tag pubtube-gateway:ci ./gateway
