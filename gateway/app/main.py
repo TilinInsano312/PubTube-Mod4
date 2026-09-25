@@ -3,10 +3,12 @@
 from fastapi import FastAPI
 
 from .api.router import api_router
+from .api.routes.metrics import router as metrics_router
 from .core.config import settings
 from .core.lifespan import lifespan
 from .middleware.correlation_id import CorrelationIdMiddleware
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
+from .middleware.metrics import MetricsMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 
 app = FastAPI(
@@ -22,7 +24,9 @@ app.add_middleware(JWTAuthenticationMiddleware)
 # Apply the limit before authentication while keeping correlation IDs outermost.
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(MetricsMiddleware)
 app.include_router(api_router)
+app.include_router(metrics_router)
 
 
 if __name__ == "__main__":

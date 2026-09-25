@@ -124,6 +124,12 @@ El `traceId` de OpenTelemetry no reemplaza al `correlationId`; ambos deben coexi
 
 ## 5. Catalogo de metricas
 
+### Integracion local Prometheus (US-D7-T2)
+
+El Gateway de M4 expone las metricas HTTP en `http://localhost:${GATEWAY_PORT:-8000}/metrics`. El endpoint es publico para scraping y esta excluido del rate limit y de su propia instrumentacion. Prometheus se levanta junto al Gateway con `docker compose up --build -d`; su interfaz queda en `http://localhost:${PROMETHEUS_PORT:-9090}`. Para comprobar la configuracion, usar `docker compose config --quiet`, abrir `/-/healthy` y consultar `/api/v1/targets`; el job `pubtube-gateway` debe estar `UP`.
+
+La configuracion vive en `prometheus/prometheus.yml`. Para incorporar M1/M2/M3 mas adelante, agregar un job y target bajo `scrape_configs` cuando el servicio correspondiente este disponible y exponga `/metrics`. Cada modulo debe usar nombres estables, unidades explicitas (por ejemplo, segundos para duraciones) y labels de baja cardinalidad. No usar `correlationId`, `eventId`, `userId`, `contentId`, correos ni titulos como labels Prometheus.
+
 ### Gateway
 
 | Metrica | Tipo | Labels | Uso |

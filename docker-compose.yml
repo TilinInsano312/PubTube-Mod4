@@ -28,6 +28,21 @@ services:
       retries: 5
       start_period: 5s
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'sed "s/__GATEWAY_PORT__/$${GATEWAY_PORT}/g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml'
+    environment:
+      GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml.template:/etc/prometheus/prometheus.yml.template:ro
+    networks:
+      - pubtube-network
+
 networks:
   pubtube-network:
     name: pubtube-network
