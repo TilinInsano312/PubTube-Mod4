@@ -13,6 +13,10 @@ fail() {
   exit 1
 }
 
+printf 'Starting Gateway and Prometheus with docker compose\n'
+docker compose up --build -d \
+  || fail "Could not start Gateway and Prometheus with docker compose up --build -d"
+
 wait_for_http_200() {
   local name="$1" url="$2" deadline=$((SECONDS + deadline_seconds))
   until curl --silent --show-error --fail --max-time 5 --output /dev/null "$url"; do
