@@ -8,6 +8,8 @@ from .logging import (
     get_correlation_id,
     get_causation_id,
     get_logger,
+    get_span_id,
+    get_trace_id,
     reset_log_context,
     set_log_context,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "get_correlation_id",
     "get_causation_id",
     "get_logger",
+    "get_span_id",
+    "get_trace_id",
     "reset_log_context",
     "set_log_context",
 ]

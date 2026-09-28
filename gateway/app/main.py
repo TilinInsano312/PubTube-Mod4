@@ -11,9 +11,19 @@ from .middleware.jwt_auth import JWTAuthenticationMiddleware
 from .middleware.metrics import MetricsMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .observability.logging import configure_structured_logging
+from .observability.tracing import GatewayTracingMiddleware, configure_tracing
 
 
 configure_structured_logging(environment=settings.environment)
+tracing_runtime = configure_tracing(
+    service_name=settings.otel_service_name,
+    service_version=settings.app_version,
+    environment=settings.environment,
+    exporter=settings.otel_traces_exporter,
+    endpoint=settings.otel_exporter_otlp_traces_endpoint,
+    sampler=settings.otel_traces_sampler,
+    sampler_arg=settings.otel_traces_sampler_arg,
+)
 
 app = FastAPI(
     title=settings.app_name,
@@ -21,6 +31,7 @@ app = FastAPI(
     description="FastAPI Gateway/BFF behind an NGINX edge proxy for PubTube.",
     lifespan=lifespan,
 )
+app.state.tracing_runtime = tracing_runtime
 
 
 # Keep correlation IDs on authentication failures as well as successful responses.
@@ -29,6 +40,7 @@ app.add_middleware(JWTAuthenticationMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(MetricsMiddleware)
+app.add_middleware(GatewayTracingMiddleware, tracer=tracing_runtime.tracer)
 app.include_router(api_router)
 app.include_router(metrics_router)
 

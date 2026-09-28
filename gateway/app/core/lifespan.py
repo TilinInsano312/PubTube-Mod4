@@ -31,8 +31,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         client=client,
         timeout=timeout,
         config=settings,
+        tracer=getattr(
+            getattr(app.state, "tracing_runtime", None),
+            "tracer",
+            None,
+        ),
     )
     try:
         yield
     finally:
         await client.aclose()
+        tracing_runtime = getattr(app.state, "tracing_runtime", None)
+        if tracing_runtime is not None:
+            tracing_runtime.force_flush()
+            tracing_runtime.shutdown()

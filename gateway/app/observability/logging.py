@@ -9,6 +9,8 @@ import logging
 import sys
 from typing import Any
 
+from .tracing import get_span_id, get_trace_id
+
 
 DEFAULT_SERVICE_NAME = "module4-gateway"
 DEFAULT_ENVIRONMENT = "local"
@@ -133,6 +135,8 @@ class JsonLogFormatter(logging.Formatter):
             "environment": self.environment,
             "correlationId": get_correlation_id(),
             "causationId": get_causation_id(),
+            "traceId": get_trace_id(),
+            "spanId": get_span_id(),
             "eventId": getattr(record, "eventId", None),
             "message": record.getMessage(),
         }

@@ -141,6 +141,15 @@ Atributos minimos:
 
 El `traceId` de OpenTelemetry no reemplaza al `correlationId`; ambos deben coexistir.
 
+Implementacion de US-D7-T3 en el Gateway de M4:
+
+- Cada request HTTP crea un span `gateway.request` y cada llamada a un modulo crea un span `gateway.upstream`.
+- La entrada y salida REST usa W3C Trace Context. El Gateway elimina `traceparent`, `tracestate` y `baggage` recibidos antes de inyectar el contexto activo.
+- `correlationId` sigue viajando en `X-Correlation-Id`, aparece como atributo `correlation_id` y no se reemplaza por `traceId`.
+- Los logs JSON agregan `traceId` y `spanId` cuando hay un span activo; siguen incluyendo `correlationId`.
+- `OTEL_TRACES_EXPORTER=none` es el valor por defecto para ejecuciones aisladas. Docker Compose lo cambia a OTLP/HTTP y conecta el Gateway con OpenTelemetry Collector y Jaeger.
+- Para la evidencia visual: ejecutar `docker compose up --build -d`, hacer una request al endpoint `/api/health` y abrir `http://localhost:${JAEGER_UI_PORT:-16686}` seleccionando el servicio `module4-gateway`.
+
 ## 5. Catalogo de metricas
 
 ### Integracion local Prometheus (US-D7-T2)
