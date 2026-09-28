@@ -122,7 +122,7 @@ class UpstreamHttpClient:
             params: Query parameters for the upstream request.
             content: Optional raw request body or asynchronous byte stream.
             json: Optional JSON request body.
-        correlation_id: Application correlation ID to propagate. If omitted,
+            correlation_id: Application correlation ID to propagate. If omitted,
             the current request context is used when available.
             raise_for_status: Whether to map upstream 4xx/5xx responses to an
                 ``UpstreamHTTPError``. Gateway proxy routes disable this to
