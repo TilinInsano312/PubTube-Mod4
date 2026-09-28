@@ -13,6 +13,7 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
     TraceState,
+    StatusCode,
     get_current_span,
     set_span_in_context,
 )
@@ -20,7 +21,7 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 
 from app.clients.http import UpstreamHttpClient
 from app.middleware.correlation_id import CorrelationIdMiddleware
-from app.observability.tracing import GatewayTracingMiddleware
+from app.observability.tracing import GatewayTracingMiddleware, _extract_context
 
 
 TIMEOUT = httpx.Timeout(connect=1, read=2, write=3, pool=4)
@@ -97,6 +98,32 @@ def test_gateway_request_span_uses_incoming_w3c_parent() -> None:
     assert span.parent.span_id == parent.span_id
 
 
+def test_gateway_request_extracts_case_insensitive_w3c_headers() -> None:
+    parent = SpanContext(
+        trace_id=0x2234567890ABCDEF1234567890ABCDEF,
+        span_id=0x2234567890ABCDEF,
+        is_remote=True,
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        trace_state=TraceState(),
+    )
+    carrier: dict[str, str] = {}
+    TraceContextTextMapPropagator().inject(
+        carrier,
+        context=set_span_in_context(NonRecordingSpan(parent)),
+    )
+    scope = {
+        "headers": [
+            (key.upper().encode("latin-1"), value.encode("latin-1"))
+            for key, value in carrier.items()
+        ]
+    }
+
+    extracted = get_current_span(_extract_context(scope)).get_span_context()
+
+    assert extracted.trace_id == parent.trace_id
+    assert extracted.span_id == parent.span_id
+
+
 def test_upstream_span_injects_active_w3c_context_and_correlation_id() -> None:
     _provider, tracer, exporter = _tracer()
     observed: dict[str, str] = {}
@@ -147,3 +174,37 @@ def test_upstream_span_injects_active_w3c_context_and_correlation_id() -> None:
     assert upstream_span.parent is not None
     assert upstream_span.parent.span_id == request_span_context.span_id
     assert upstream_span.attributes["correlation_id"] == "upstream-correlation-id"
+
+
+def test_upstream_5xx_span_is_error_when_response_is_returned() -> None:
+    _provider, tracer, exporter = _tracer()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, request=request)
+
+    async_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    upstream_client = UpstreamHttpClient(
+        module="module1",
+        base_url="http://module-one.test",
+        client=async_client,
+        timeout=TIMEOUT,
+        tracer=tracer,
+    )
+
+    try:
+        response = _run(
+            upstream_client.request(
+                "GET",
+                "/content",
+                raise_for_status=False,
+            )
+        )
+    finally:
+        _run(async_client.aclose())
+
+    upstream_span = next(
+        span for span in exporter.get_finished_spans() if span.name == "gateway.upstream"
+    )
+
+    assert response.status_code == 503  # type: ignore[union-attr]
+    assert upstream_span.status.status_code == StatusCode.ERROR

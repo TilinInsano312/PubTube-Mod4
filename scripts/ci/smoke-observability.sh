@@ -4,6 +4,7 @@ set -Eeuo pipefail
 gateway_port="${GATEWAY_PORT:-8000}"
 prometheus_port="${PROMETHEUS_PORT:-9090}"
 jaeger_port="${JAEGER_UI_PORT:-16686}"
+otel_service_name="${OTEL_SERVICE_NAME:-module4-gateway}"
 gateway_base="http://127.0.0.1:${gateway_port}"
 prometheus_base="http://127.0.0.1:${prometheus_port}"
 jaeger_base="http://127.0.0.1:${jaeger_port}"
@@ -17,7 +18,7 @@ fail() {
 
 printf 'Starting Gateway, Prometheus and tracing backend with docker compose\n'
 docker compose up --build -d \
-  || fail "Could not start Gateway and Prometheus with docker compose up --build -d"
+  || fail "Could not start Gateway, Prometheus and tracing backend with docker compose up --build -d"
 
 wait_for_http_200() {
   local name="$1" url="$2" deadline=$((SECONDS + deadline_seconds))
@@ -55,7 +56,7 @@ deadline=$((SECONDS + deadline_seconds))
 while :; do
   traces_file="$(mktemp)"
   if ! curl --silent --show-error --fail --max-time 10 --get \
-    --data-urlencode 'service=module4-gateway' \
+    --data-urlencode "service=${otel_service_name}" \
     --data-urlencode 'lookback=1h' \
     --data-urlencode 'limit=20' \
     "${jaeger_base}/api/traces" --output "$traces_file"; then
@@ -78,12 +79,12 @@ raise SystemExit(1)
 PY
   then
     rm -f "$traces_file"
-    printf 'PASS: Jaeger contains a module4-gateway gateway.request span\n'
+    printf 'PASS: Jaeger contains a %s gateway.request span\n' "$otel_service_name"
     break
   fi
   rm -f "$traces_file"
   if (( SECONDS >= deadline )); then
-    fail "Jaeger did not receive a module4-gateway gateway.request span within ${deadline_seconds}s"
+    fail "Jaeger did not receive a ${otel_service_name} gateway.request span within ${deadline_seconds}s"
   fi
   sleep "$poll_seconds"
 done

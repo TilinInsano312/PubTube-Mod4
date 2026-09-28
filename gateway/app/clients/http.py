@@ -190,11 +190,11 @@ class UpstreamHttpClient:
                 raise UpstreamUnavailableError(self.module) from exc
 
             span.set_attribute("http.response.status_code", response.status_code)
+            if response.status_code >= 500:
+                span.set_status(
+                    Status(StatusCode.ERROR, f"HTTP {response.status_code}")
+                )
             if raise_for_status and response.is_error:
-                if response.status_code >= 500:
-                    span.set_status(
-                        Status(StatusCode.ERROR, f"HTTP {response.status_code}")
-                    )
                 raise UpstreamHTTPError(self.module, response.status_code)
 
             return response

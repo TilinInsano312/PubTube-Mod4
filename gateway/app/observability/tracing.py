@@ -183,7 +183,7 @@ def _extract_context(scope: Scope) -> Any:
     """Extract W3C headers from an ASGI request scope."""
 
     carrier = {
-        key.decode("latin-1"): value.decode("latin-1")
+        key.decode("latin-1").lower(): value.decode("latin-1")
         for key, value in scope.get("headers", [])
     }
     return propagate.extract(carrier)
