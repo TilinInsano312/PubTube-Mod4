@@ -98,7 +98,6 @@ class JsonLogFormatter(logging.Formatter):
     """Format application log records as one JSON object per line."""
 
     _OPTIONAL_FIELDS = (
-        "eventId",
         "route",
         "method",
         "statusCode",
@@ -134,6 +133,7 @@ class JsonLogFormatter(logging.Formatter):
             "environment": self.environment,
             "correlationId": get_correlation_id(),
             "causationId": get_causation_id(),
+            "eventId": getattr(record, "eventId", None),
             "message": record.getMessage(),
         }
 

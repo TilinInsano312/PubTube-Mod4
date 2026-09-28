@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from ..observability.logging import (
     get_logger,
@@ -47,7 +47,11 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
                 error_code="INTERNAL_SERVER_ERROR",
                 error_type=type(exc).__name__,
             )
-            raise
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal Server Error"},
+                headers={CORRELATION_ID_HEADER: correlation_id},
+            )
         else:
             response.headers[CORRELATION_ID_HEADER] = correlation_id
             _log_request(

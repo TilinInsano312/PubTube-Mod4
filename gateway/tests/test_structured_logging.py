@@ -63,6 +63,7 @@ def test_request_log_contains_common_structured_fields(
     assert record["environment"] == "local"
     assert record["correlationId"] == correlation_id
     assert record["causationId"] is None
+    assert record["eventId"] is None
     assert record["message"] == "request completed"
     assert record["route"] == "/api/health"
     assert record["method"] == "GET"
@@ -114,12 +115,14 @@ def test_error_log_contains_correlation_id_without_authorization_secret(
     raw_logs = log_stream.getvalue()
 
     assert response.status_code == 500
+    assert response.headers["X-Correlation-Id"] == correlation_id
     assert record["level"] == "ERROR"
     assert record["message"] == "request failed"
     assert record["correlationId"] == correlation_id
     assert record["statusCode"] == 500
     assert record["errorCode"] == "INTERNAL_SERVER_ERROR"
     assert record["errorType"] == "RuntimeError"
+    assert record["eventId"] is None
     assert secret not in raw_logs
 
 
