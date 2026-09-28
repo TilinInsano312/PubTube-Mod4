@@ -10,6 +10,7 @@ from .errors import (
     UpstreamTimeoutError,
     UpstreamUnavailableError,
 )
+from ..observability.logging import get_correlation_id
 
 HOP_BY_HOP_HEADERS = frozenset(
     {
@@ -62,11 +63,14 @@ def build_forward_headers(
             continue
         forwarded[name] = value
 
-    if correlation_id is not None:
+    effective_correlation_id = (
+        get_correlation_id() if correlation_id is None else correlation_id
+    )
+    if effective_correlation_id is not None:
         for name in list(forwarded):
             if name.lower() == "x-correlation-id":
                 del forwarded[name]
-        forwarded["X-Correlation-Id"] = correlation_id
+        forwarded["X-Correlation-Id"] = effective_correlation_id
 
     return forwarded
 
@@ -118,7 +122,8 @@ class UpstreamHttpClient:
             params: Query parameters for the upstream request.
             content: Optional raw request body or asynchronous byte stream.
             json: Optional JSON request body.
-            correlation_id: Application correlation ID to propagate.
+            correlation_id: Application correlation ID to propagate. If omitted,
+            the current request context is used when available.
             raise_for_status: Whether to map upstream 4xx/5xx responses to an
                 ``UpstreamHTTPError``. Gateway proxy routes disable this to
                 preserve the upstream response contract.
