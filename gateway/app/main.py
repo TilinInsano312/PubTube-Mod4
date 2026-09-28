@@ -8,6 +8,10 @@ from .core.lifespan import lifespan
 from .middleware.correlation_id import CorrelationIdMiddleware
 from .middleware.jwt_auth import JWTAuthenticationMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
+from .observability.logging import configure_structured_logging
+
+
+configure_structured_logging(environment=settings.environment)
 
 app = FastAPI(
     title=settings.app_name,
@@ -28,4 +32,9 @@ app.include_router(api_router)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=settings.gateway_port)
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=settings.gateway_port,
+        access_log=False,
+    )

@@ -13,4 +13,4 @@ COPY app ./app
 
 EXPOSE ${GATEWAY_PORT}
 
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${GATEWAY_PORT}\""]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${GATEWAY_PORT}\" --no-access-log"]

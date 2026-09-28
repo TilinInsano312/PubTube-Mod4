@@ -11,6 +11,10 @@ class Settings(BaseSettings):
         default="PubTube API Gateway",
         validation_alias="GATEWAY_APP_NAME",
     )
+    environment: str = Field(
+        default="local",
+        validation_alias="GATEWAY_ENVIRONMENT",
+    )
     app_version: str = Field(
         default="0.1.0",
         validation_alias="GATEWAY_APP_VERSION",

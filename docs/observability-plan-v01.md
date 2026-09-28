@@ -82,6 +82,25 @@ Campos adicionales recomendados:
 
 No se deben registrar secretos, tokens OAuth, JWT completos, refresh tokens, passwords ni URLs firmadas sensibles.
 
+#### Contrato operativo para el Gateway y los módulos
+
+- El Gateway reutiliza un `X-Correlation-Id` no vacío y seguro cuando el cliente
+  lo envía; si falta, genera un UUID v4.
+- El identificador se conserva en el contexto de la request, se devuelve en la
+  respuesta y se reenvía en toda llamada REST interna.
+- Cada línea se emite como un objeto JSON independiente a stdout. El campo
+  `service` identifica al productor, por ejemplo `module4-gateway`.
+- El Gateway desactiva los access logs de Uvicorn para evitar líneas de texto
+  duplicadas; el middleware es la fuente estructurada de logs HTTP.
+- `causationId` es nullable para requests HTTP. En eventos debe apuntar al
+  evento o request que originó la acción y no debe confundirse con
+  `correlationId`.
+- Los errores deben incluir `errorCode`, `statusCode` y `correlationId`, sin
+  incluir credenciales, tokens, cuerpos completos ni headers sensibles.
+- Los módulos A, B y C deben conservar los mismos nombres de campos y reglas,
+  cambiando únicamente el valor de `service` y los campos específicos de su
+  dominio.
+
 ### 4.3 Metricas Prometheus
 
 Cada servicio backend debe exponer `/metrics`. Las metricas deben usar nombres estables, labels de baja cardinalidad y unidades explicitas.
