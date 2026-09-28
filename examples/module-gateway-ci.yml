@@ -1,0 +1,137 @@
+name: Module and Gateway integration example
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-integration:
+    name: Build module and smoke-test through Gateway
+    runs-on: ubuntu-latest
+    env:
+      MODULE_SLOT: ${{ vars.MODULE_SLOT || '1' }}
+      MODULE_PORT: ${{ vars.MODULE_PORT || '8001' }}
+      MODULE_HEALTH_PATH: ${{ vars.MODULE_HEALTH_PATH || '/health' }}
+      GATEWAY_SMOKE_PATH: ${{ vars.GATEWAY_SMOKE_PATH || '' }}
+      JWT_SECRET: module-ci-only-secret-change-this-value
+    steps:
+      - name: Checkout module
+        uses: actions/checkout@v4
+
+      - name: Checkout PubTube Gateway
+        uses: actions/checkout@v4
+        with:
+          repository: TilinInsano312/PubTube-Mod4
+          ref: ${{ vars.GATEWAY_REF || 'develop' }}
+          path: gateway-source
+          token: ${{ secrets.GATEWAY_REPO_TOKEN || github.token }}
+
+      - name: Validate module integration settings
+        id: settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$MODULE_SLOT" =~ ^[123]$ ]]; then
+            printf 'MODULE_SLOT must be 1, 2, or 3.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$MODULE_PORT" =~ ^[0-9]+$ ]] || (( MODULE_PORT < 1 || MODULE_PORT > 65535 )); then
+            printf 'MODULE_PORT must be between 1 and 65535.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$MODULE_HEALTH_PATH" =~ ^/[A-Za-z0-9._~/%-]+$ ]]; then
+            printf 'MODULE_HEALTH_PATH must be an absolute URL path.\n' >&2
+            exit 1
+          fi
+
+          smoke_path="$GATEWAY_SMOKE_PATH"
+          if [[ -z "$smoke_path" ]]; then
+            case "$MODULE_SLOT" in
+              1) smoke_path=/api/content ;;
+              2) smoke_path=/api/events/ci-correlation-id ;;
+              3) smoke_path=/api/publish/ci-publication/status ;;
+            esac
+          fi
+          if [[ ! "$smoke_path" =~ ^/[A-Za-z0-9._~/%-]+$ ]]; then
+            printf 'GATEWAY_SMOKE_PATH must be an absolute URL path.\n' >&2
+            exit 1
+          fi
+          printf 'smoke_path=%s\n' "$smoke_path" >> "$GITHUB_OUTPUT"
+
+      - name: Build module image
+        run: docker build --tag pubtube-module-under-test:ci .
+
+      - name: Build Gateway image
+        run: docker build --tag pubtube-gateway:integration ./gateway-source/gateway
+
+      - name: Create integration network
+        run: docker network create module-gateway-integration
+
+      - name: Start module container
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Adjust PORT and add the module's required environment variables here.
+          docker run --detach \
+            --name module-under-test \
+            --network module-gateway-integration \
+            --network-alias module-under-test \
+            --publish "$MODULE_PORT:$MODULE_PORT" \
+            --env "PORT=$MODULE_PORT" \
+            pubtube-module-under-test:ci
+
+      - name: Start Gateway container
+        shell: bash
+        run: |
+          set -euo pipefail
+          gateway_env=(
+            --env GATEWAY_PORT=8000
+            --env "JWT_SECRET=$JWT_SECRET"
+            --env JWT_ALGORITHM=HS256
+          )
+          gateway_env+=(--env "MODULE${MODULE_SLOT}_URL=http://module-under-test:$MODULE_PORT")
+
+          docker run --detach \
+            --name gateway-under-test \
+            --network module-gateway-integration \
+            --publish 8000:8000 \
+            "${gateway_env[@]}" \
+            pubtube-gateway:integration
+
+      - name: Wait for module and Gateway health
+        env:
+          GATEWAY_SMOKE_PATH: ${{ steps.settings.outputs.smoke_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 30 --retry-connrefused --retry-delay 2 --retry-max-time 90 \
+            --fail --silent --show-error \
+            "http://127.0.0.1:$MODULE_PORT$MODULE_HEALTH_PATH" --output /dev/null
+          curl --retry 30 --retry-connrefused --retry-delay 2 --retry-max-time 90 \
+            --fail --silent --show-error \
+            http://127.0.0.1:8000/api/health --output /dev/null
+
+          token="$(docker exec gateway-under-test python -c \
+            'import os,time,jwt; print(jwt.encode({"sub":"module-ci","user_id":"module-ci","role":"admin","exp":int(time.time())+300}, os.environ["JWT_SECRET"], algorithm="HS256"))')"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $token" \
+            --header "X-Correlation-Id: module-ci-${GITHUB_RUN_ID}" \
+            "http://127.0.0.1:8000$GATEWAY_SMOKE_PATH" --output /dev/null
+
+      - name: Show containers and logs on failure
+        if: failure()
+        run: |
+          docker ps -a || true
+          docker logs module-under-test || true
+          docker logs gateway-under-test || true
+
+      - name: Clean up integration containers
+        if: always()
+        run: |
+          docker rm --force module-under-test gateway-under-test || true
+          docker network rm module-gateway-integration || true

@@ -82,3 +82,77 @@ jobs:
       - name: Clean up Docker stack
         if: always()
         run: docker compose down --volumes --remove-orphans || true
+
+  deploy-develop:
+    name: Deploy develop to server
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    concurrency:
+      group: deploy-develop
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/pubtube-mod4' }}
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_PORT; do
+            if [[ -z "${!name}" ]]; then
+              printf 'Required deployment setting is missing: %s\n' "$name" >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            printf 'DEPLOY_HOST must be a hostname or IPv4 address.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_USER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            printf 'DEPLOY_USER contains unsupported characters.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]] || (( DEPLOY_PORT < 1 || DEPLOY_PORT > 65535 )); then
+            printf 'DEPLOY_PORT must be between 1 and 65535.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ || "$DEPLOY_PATH" == *"/../"* || "$DEPLOY_PATH" == */.. ]]; then
+            printf 'DEPLOY_PATH must be an absolute path without parent-directory segments.\n' >&2
+            exit 1
+          fi
+
+          ssh_dir="$RUNNER_TEMP/deploy-ssh"
+          install -m 700 -d "$ssh_dir"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/deploy_key" "$ssh_dir/known_hosts"
+
+      - name: Upload commit and restart Compose stack
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/pubtube-mod4' }}
+        run: |
+          set -euo pipefail
+          ssh_dir="$RUNNER_TEMP/deploy-ssh"
+          remote="$DEPLOY_USER@$DEPLOY_HOST"
+          remote_command="mkdir -p '$DEPLOY_PATH' && tar -xf - -C '$DEPLOY_PATH' && cd '$DEPLOY_PATH' && docker compose up --detach --build --force-recreate --remove-orphans --wait --wait-timeout 120 && docker compose ps"
+
+          git archive --format=tar "$GITHUB_SHA" | ssh \
+            -i "$ssh_dir/deploy_key" \
+            -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            "$remote" "$remote_command"
