@@ -79,6 +79,27 @@ class Settings(BaseSettings):
         validation_alias="TRUSTED_PROXY_IPS",
     )
 
+    otel_service_name: str = Field(
+        default="module4-gateway",
+        validation_alias="OTEL_SERVICE_NAME",
+    )
+    otel_traces_exporter: str = Field(
+        default="none",
+        validation_alias="OTEL_TRACES_EXPORTER",
+    )
+    otel_exporter_otlp_traces_endpoint: str = Field(
+        default="",
+        validation_alias="OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    )
+    otel_traces_sampler: str = Field(
+        default="always_on",
+        validation_alias="OTEL_TRACES_SAMPLER",
+    )
+    otel_traces_sampler_arg: str = Field(
+        default="",
+        validation_alias="OTEL_TRACES_SAMPLER_ARG",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

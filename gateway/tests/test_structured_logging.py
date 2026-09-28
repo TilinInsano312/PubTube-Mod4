@@ -63,6 +63,10 @@ def test_request_log_contains_common_structured_fields(
     assert record["environment"] == "local"
     assert record["correlationId"] == correlation_id
     assert record["causationId"] is None
+    assert isinstance(record["traceId"], str)
+    assert len(record["traceId"]) == 32
+    assert isinstance(record["spanId"], str)
+    assert len(record["spanId"]) == 16
     assert record["eventId"] is None
     assert record["message"] == "request completed"
     assert record["route"] == "/api/health"

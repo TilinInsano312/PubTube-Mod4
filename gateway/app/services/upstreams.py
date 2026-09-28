@@ -3,6 +3,7 @@
 from enum import StrEnum
 
 import httpx
+from opentelemetry.trace import Tracer
 
 from ..clients.http import UpstreamHttpClient
 from ..core.config import Settings
@@ -25,9 +26,11 @@ class UpstreamService:
         client: httpx.AsyncClient,
         timeout: httpx.Timeout,
         config: Settings,
+        tracer: Tracer | None = None,
     ) -> None:
         self._client = client
         self._timeout = timeout
+        self._tracer = tracer
         self._urls = {
             UpstreamModule.MODULE1: config.module1_url,
             UpstreamModule.MODULE2: config.module2_url,
@@ -49,4 +52,5 @@ class UpstreamService:
             base_url=self._urls[module],
             client=self._client,
             timeout=self._timeout,
+            tracer=self._tracer,
         )

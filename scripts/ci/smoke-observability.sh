@@ -3,8 +3,10 @@ set -Eeuo pipefail
 
 gateway_port="${GATEWAY_PORT:-8000}"
 prometheus_port="${PROMETHEUS_PORT:-9090}"
+jaeger_port="${JAEGER_UI_PORT:-16686}"
 gateway_base="http://127.0.0.1:${gateway_port}"
 prometheus_base="http://127.0.0.1:${prometheus_port}"
+jaeger_base="http://127.0.0.1:${jaeger_port}"
 deadline_seconds="${SMOKE_TIMEOUT_SECONDS:-120}"
 poll_seconds="${SMOKE_POLL_SECONDS:-3}"
 
@@ -13,7 +15,7 @@ fail() {
   exit 1
 }
 
-printf 'Starting Gateway and Prometheus with docker compose\n'
+printf 'Starting Gateway, Prometheus and tracing backend with docker compose\n'
 docker compose up --build -d \
   || fail "Could not start Gateway and Prometheus with docker compose up --build -d"
 
@@ -30,6 +32,13 @@ wait_for_http_200() {
 
 wait_for_http_200 "Gateway" "${gateway_base}/api/health"
 wait_for_http_200 "Prometheus" "${prometheus_base}/-/healthy"
+wait_for_http_200 "Jaeger" "${jaeger_base}/api/services"
+
+curl --silent --show-error --fail --max-time 10 \
+  -H 'X-Correlation-Id: ci-trace-smoke' \
+  "${gateway_base}/api/health" --output /dev/null \
+  || fail "Could not create a trace smoke request through ${gateway_base}/api/health"
+printf 'PASS: Trace smoke request completed with correlation ID\n'
 
 metrics_file="$(mktemp)"
 trap 'rm -f "$metrics_file"' EXIT
@@ -41,6 +50,43 @@ for metric in pubtube_gateway_requests_total pubtube_gateway_request_duration_se
   fi
 done
 printf 'PASS: Gateway exposes required HTTP metrics\n'
+
+deadline=$((SECONDS + deadline_seconds))
+while :; do
+  traces_file="$(mktemp)"
+  if ! curl --silent --show-error --fail --max-time 10 --get \
+    --data-urlencode 'service=module4-gateway' \
+    --data-urlencode 'lookback=1h' \
+    --data-urlencode 'limit=20' \
+    "${jaeger_base}/api/traces" --output "$traces_file"; then
+    rm -f "$traces_file"
+    fail "Could not query Jaeger traces API"
+  fi
+  if python3 - "$traces_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    data = json.load(source)
+traces = data.get("data", [])
+if any(
+    any(span.get("operationName") == "gateway.request" for span in trace.get("spans", []))
+    for trace in traces
+):
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+  then
+    rm -f "$traces_file"
+    printf 'PASS: Jaeger contains a module4-gateway gateway.request span\n'
+    break
+  fi
+  rm -f "$traces_file"
+  if (( SECONDS >= deadline )); then
+    fail "Jaeger did not receive a module4-gateway gateway.request span within ${deadline_seconds}s"
+  fi
+  sleep "$poll_seconds"
+done
 
 deadline=$((SECONDS + deadline_seconds))
 while :; do

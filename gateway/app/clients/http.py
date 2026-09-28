@@ -4,6 +4,8 @@ from collections.abc import AsyncIterable, Mapping, Sequence
 from typing import Any
 
 import httpx
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode, Tracer
 
 from .errors import (
     UpstreamHTTPError,
@@ -11,6 +13,11 @@ from .errors import (
     UpstreamUnavailableError,
 )
 from ..observability.logging import get_correlation_id
+from ..observability.tracing import inject_trace_context
+
+
+TRACER_NAME = "pubtube.gateway"
+W3C_CONTEXT_HEADERS = frozenset({"traceparent", "tracestate", "baggage"})
 
 HOP_BY_HOP_HEADERS = frozenset(
     {
@@ -59,7 +66,11 @@ def build_forward_headers(
     forwarded: dict[str, str] = {}
     for name, value in incoming_headers.items():
         normalized_name = name.lower()
-        if normalized_name in hop_by_hop_headers or normalized_name == "host":
+        if (
+            normalized_name in hop_by_hop_headers
+            or normalized_name == "host"
+            or normalized_name in W3C_CONTEXT_HEADERS
+        ):
             continue
         forwarded[name] = value
 
@@ -71,6 +82,8 @@ def build_forward_headers(
             if name.lower() == "x-correlation-id":
                 del forwarded[name]
         forwarded["X-Correlation-Id"] = effective_correlation_id
+
+    inject_trace_context(forwarded)
 
     return forwarded
 
@@ -85,6 +98,7 @@ class UpstreamHttpClient:
         base_url: str,
         client: httpx.AsyncClient,
         timeout: httpx.Timeout,
+        tracer: Tracer | None = None,
     ) -> None:
         if not base_url or not base_url.startswith(("http://", "https://")):
             raise ValueError(f"Invalid base URL for upstream module: {module}")
@@ -93,6 +107,7 @@ class UpstreamHttpClient:
         self.base_url = base_url.rstrip("/")
         self._client = client
         self.timeout = timeout
+        self._tracer = tracer or trace.get_tracer(TRACER_NAME)
 
     def build_url(self, path: str) -> str:
         """Build a URL from a relative, explicitly selected upstream path."""
@@ -137,22 +152,49 @@ class UpstreamHttpClient:
             UpstreamHTTPError: If the upstream returns a 4xx or 5xx response.
         """
 
-        try:
-            response = await self._client.request(
-                method=method,
-                url=self.build_url(path),
-                headers=build_forward_headers(headers, correlation_id=correlation_id),
-                params=params,
-                content=content,
-                json=json,
-                timeout=self.timeout,
-            )
-        except httpx.TimeoutException as exc:
-            raise UpstreamTimeoutError(self.module) from exc
-        except httpx.RequestError as exc:
-            raise UpstreamUnavailableError(self.module) from exc
+        effective_correlation_id = (
+            get_correlation_id() if correlation_id is None else correlation_id
+        )
+        span_attributes: dict[str, str] = {
+            "upstream.service": self.module,
+            "http.request.method": method.upper(),
+        }
+        if effective_correlation_id is not None:
+            span_attributes["correlation_id"] = effective_correlation_id
 
-        if raise_for_status and response.is_error:
-            raise UpstreamHTTPError(self.module, response.status_code)
+        with self._tracer.start_as_current_span(
+            "gateway.upstream",
+            kind=SpanKind.CLIENT,
+            attributes=span_attributes,
+        ) as span:
+            try:
+                response = await self._client.request(
+                    method=method,
+                    url=self.build_url(path),
+                    headers=build_forward_headers(
+                        headers,
+                        correlation_id=effective_correlation_id,
+                    ),
+                    params=params,
+                    content=content,
+                    json=json,
+                    timeout=self.timeout,
+                )
+            except httpx.TimeoutException as exc:
+                span.record_exception(exc)
+                span.set_status(Status(StatusCode.ERROR, "upstream timeout"))
+                raise UpstreamTimeoutError(self.module) from exc
+            except httpx.RequestError as exc:
+                span.record_exception(exc)
+                span.set_status(Status(StatusCode.ERROR, "upstream unavailable"))
+                raise UpstreamUnavailableError(self.module) from exc
 
-        return response
+            span.set_attribute("http.response.status_code", response.status_code)
+            if raise_for_status and response.is_error:
+                if response.status_code >= 500:
+                    span.set_status(
+                        Status(StatusCode.ERROR, f"HTTP {response.status_code}")
+                    )
+                raise UpstreamHTTPError(self.module, response.status_code)
+
+            return response
