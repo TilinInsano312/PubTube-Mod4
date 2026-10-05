@@ -2,6 +2,8 @@
 
 Cada push a `develop` ejecuta las pruebas del módulo, construye su imagen, comprueba una petición a través de la imagen publicada del Gateway y, si todo pasa, publica `ghcr.io/<owner>/<repo>:develop`. La VPS ejecuta [docker-compose.prod.yml](../docker-compose.prod.yml); WUD detecta el digest nuevo y actualiza el servicio. Los repositorios de los módulos no necesitan SSH ni secretos de producción.
 
+La VPS usa `linux/arm64`. La plantilla publica manifiestos para `linux/amd64` y `linux/arm64`; ambos deben estar presentes en cada imagen que se despliegue aquí.
+
 | Servicio | Imagen GHCR | Puerto interno | Salud en Gateway |
 | --- | --- | --- | --- |
 | Gateway | `ghcr.io/tilininsano312/pubtube-mod4:develop` | 8000 | `/api/health` |
@@ -46,7 +48,7 @@ Las ramas por defecto son `main`: cada equipo debe usar `develop` para activar l
 
 ## VPS
 
-Instalar [docker-compose.prod.yml](../docker-compose.prod.yml) en `/opt/pubtube-mod4` junto con los archivos de observabilidad. Crear `/opt/pubtube-mod4/secrets/jwt_secret` con una clave aleatoria y permisos restringidos antes del primer arranque. El Gateway lee `/run/secrets/jwt_secret` mediante `JWT_SECRET_FILE`; `secrets/` está ignorado por Git.
+Instalar [docker-compose.prod.yml](../docker-compose.prod.yml) en `/opt/pubtube-mod4` junto con los archivos de observabilidad. Crear `/opt/pubtube-mod4/secrets/jwt_secret` y `/opt/pubtube-mod4/secrets/wud_admin_password` con valores aleatorios y permisos restringidos antes del primer arranque. El Gateway lee `/run/secrets/jwt_secret` mediante `JWT_SECRET_FILE`; WUD usa el segundo archivo para crear su administrador inicial. `secrets/` está ignorado por Git.
 
 WUD monta `/opt/pubtube-mod4` en la misma ruta para que el trigger de Compose encuentre el archivo Compose, los archivos de observabilidad y los secretos cuando recrea los servicios. Tiene acceso al socket Docker; solo el administrador de la VPS debe poder modificar ese Compose. `wud.watch.digest=true` permite detectar cambios del tag fijo `develop`.
 

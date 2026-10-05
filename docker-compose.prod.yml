@@ -96,7 +96,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/pubtube-mod4:/opt/pubtube-mod4
+      - wud-data:/store
+    secrets:
+      - wud_admin_password
     environment:
+      WUD_AUTH_ADMIN_USER: admin
+      WUD_AUTH_ADMIN_PASSWORD__FILE: /run/secrets/wud_admin_password
       WUD_WATCHER_LOCAL_WATCHBYDEFAULT: "false"
       WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_FILE: /opt/pubtube-mod4/docker-compose.prod.yml
       WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_BACKUP: "true"
@@ -110,3 +115,8 @@ networks:
 secrets:
   jwt_secret:
     file: ./secrets/jwt_secret
+  wud_admin_password:
+    file: ./secrets/wud_admin_password
+
+volumes:
+  wud-data:

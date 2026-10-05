@@ -136,14 +136,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up QEMU
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: docker/setup-buildx-action@v3
+
       - name: Publish module image
         if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         shell: bash
         run: |
           set -euo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY,,}:develop"
-          docker tag pubtube-module-under-test:ci "$image"
-          docker push "$image"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --tag "$image" \
+            --push .
 
       - name: Show containers and logs on failure
         if: failure()
