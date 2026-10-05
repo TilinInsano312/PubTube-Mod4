@@ -11,6 +11,16 @@ from .proxy import proxy_request, quote_path_segment
 router = APIRouter(tags=["module3"])
 
 
+@router.get("/publish/health")
+async def module3_health(
+    request: Request,
+    upstream_service: UpstreamService = Depends(get_upstream_service),
+) -> Response:
+    """Forward a Gateway smoke check to Module 3's health endpoint."""
+
+    return await proxy_request(request, upstream_service, UpstreamModule.MODULE3, "/health")
+
+
 @router.post("/publish/schedule")
 async def schedule_publication(
     request: Request,

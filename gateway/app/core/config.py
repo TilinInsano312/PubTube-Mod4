@@ -1,6 +1,9 @@
 """Centralized settings for the PubTube API Gateway."""
 
+from pathlib import Path
+
 from pydantic import AliasChoices, Field
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,6 +59,7 @@ class Settings(BaseSettings):
     )
 
     jwt_secret: str = Field(default="", validation_alias="JWT_SECRET")
+    jwt_secret_file: str = Field(default="", validation_alias="JWT_SECRET_FILE")
     jwt_algorithm: str = Field(
         default="HS256",
         validation_alias="JWT_ALGORITHM",
@@ -105,6 +109,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def load_jwt_secret_file(self) -> "Settings":
+        if self.jwt_secret_file:
+            self.jwt_secret = Path(self.jwt_secret_file).read_text(encoding="utf-8").strip()
+            if not self.jwt_secret:
+                raise ValueError("JWT_SECRET_FILE is empty")
+        return self
 
 
 settings = Settings()
