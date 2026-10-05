@@ -74,9 +74,13 @@ class PublicationDashboardService:
             A stable aggregation with scheduled, published, and failed buckets.
 
         Raises:
-            ValueError: If the lower bound is after the upper bound.
+            ValueError: If a timestamp is naive or the range is inverted.
             UnsupportedPublicationState: If a record has an unknown state.
         """
+        if from_at is not None:
+            _require_aware(from_at, "from_at")
+        if to_at is not None:
+            _require_aware(to_at, "to_at")
         if from_at is not None and to_at is not None and from_at > to_at:
             raise ValueError("from_at must be less than or equal to to_at")
 
@@ -90,6 +94,7 @@ class PublicationDashboardService:
             "failed": [],
         }
         for record in records:
+            _require_aware(record.schedule_at, "PublicationRecord.schedule_at")
             if from_at is not None and record.schedule_at < from_at:
                 continue
             if to_at is not None and record.schedule_at > to_at:
@@ -111,3 +116,9 @@ class PublicationDashboardService:
 def _bucket(items: list[PublicationRecord]) -> PublicationStatusBucket:
     """Create a bucket whose count always matches its details."""
     return PublicationStatusBucket(count=len(items), items=items)
+
+
+def _require_aware(value: datetime, field_name: str) -> None:
+    """Reject datetimes without a usable timezone offset."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
