@@ -103,6 +103,7 @@ services:
       WUD_AUTH_ADMIN_USER: admin
       WUD_AUTH_ADMIN_PASSWORD__FILE: /run/secrets/wud_admin_password
       WUD_WATCHER_LOCAL_WATCHBYDEFAULT: "false"
+      WUD_WATCHER_LOCAL_CRON: "*/5 * * * *"
       WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_FILE: /opt/pubtube-mod4/docker-compose.prod.yml
       WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_BACKUP: "true"
     labels:
