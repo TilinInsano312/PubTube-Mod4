@@ -1,15 +1,21 @@
+name: pubtube-mod4
+
 services:
   gateway:
-    build:
-      context: ./gateway
-      dockerfile: Dockerfile
+    image: ghcr.io/tilininsano312/pubtube-mod4:develop
+    restart: unless-stopped
+    labels:
+      wud.watch: "true"
+      wud.watch.digest: "true"
+      wud.tag.include: "^develop$"
+      wud.trigger.include: dockercompose.local
     environment:
       GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
       GATEWAY_ENVIRONMENT: "${GATEWAY_ENVIRONMENT:-local}"
       MODULE1_URL: "${MODULE1_URL:-http://module1-api:8000}"
       MODULE2_URL: "${MODULE2_URL:-http://module2-api:8002}"
       MODULE3_URL: "${MODULE3_URL:-http://module3-api:8003}"
-      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
       JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
       RATE_LIMIT_REQUESTS: "${RATE_LIMIT_REQUESTS:-60}"
       RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-60}"
@@ -21,6 +27,8 @@ services:
       OTEL_TRACES_SAMPLER_ARG: "${OTEL_TRACES_SAMPLER_ARG:-}"
     ports:
       - "${GATEWAY_PORT:-8000}:${GATEWAY_PORT:-8000}"
+    secrets:
+      - jwt_secret
     networks:
       - pubtube-network
     depends_on:
@@ -42,6 +50,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.5.0
+    restart: unless-stopped
     entrypoint:
       - /bin/sh
       - -c
@@ -57,6 +66,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.104.0
+    restart: unless-stopped
     command:
       - --config=/etc/otelcol-contrib/config.yaml
     depends_on:
@@ -72,6 +82,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.57
+    restart: unless-stopped
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
@@ -79,6 +90,34 @@ services:
     networks:
       - pubtube-network
 
+  wud:
+    image: getwud/wud:9
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/pubtube-mod4:/opt/pubtube-mod4
+      - wud-data:/store
+    secrets:
+      - wud_admin_password
+    environment:
+      WUD_AUTH_ADMIN_USER: admin
+      WUD_AUTH_ADMIN_PASSWORD__FILE: /run/secrets/wud_admin_password
+      WUD_WATCHER_LOCAL_WATCHBYDEFAULT: "false"
+      WUD_WATCHER_LOCAL_CRON: "*/5 * * * *"
+      WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_FILE: /opt/pubtube-mod4/docker-compose.prod.yml
+      WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_BACKUP: "true"
+    labels:
+      wud.watch: "false"
+
 networks:
   pubtube-network:
     name: pubtube-network
+
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret
+  wud_admin_password:
+    file: ./secrets/wud_admin_password
+
+volumes:
+  wud-data:
