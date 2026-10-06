@@ -1,5 +1,10 @@
 # PubTube-Mod4
 
+## API del dashboard
+
+`GET /api/dashboard` acepta filtros opcionales `from` y `to`, valida fechas y
+requiere JWT. Consulta el [contrato y la integración pendiente del agregador](docs/dashboard-api.md).
+
 ## Prometheus local
 
 Levanta el Gateway y Prometheus con `docker compose up --build -d`. Prometheus queda en <http://localhost:9090> y las metricas del Gateway en <http://localhost:8000/metrics>. Comprueba la salud con `curl -fsS http://localhost:9090/-/healthy` y el scrape en `curl -fsS http://localhost:9090/api/v1/targets` (el job `pubtube-gateway` debe indicar `up`). `GATEWAY_PORT` define el puerto real de escucha del Gateway y se publica en el mismo puerto del host; Prometheus adapta automáticamente su target a ese valor. Por ejemplo, `GATEWAY_PORT=8010 docker compose up --build -d` publica el Gateway en `http://localhost:8010`. El puerto web de Prometheus se puede cambiar con `PROMETHEUS_PORT`.
