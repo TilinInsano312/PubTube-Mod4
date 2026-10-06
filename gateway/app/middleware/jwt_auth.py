@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from ..core.config import settings
+from ..api.errors import dashboard_error
 
 
 PUBLIC_PATHS = frozenset(
@@ -40,11 +41,11 @@ class JWTAuthenticationMiddleware(BaseHTTPMiddleware):
 
         token = _extract_bearer_token(request.headers.get("Authorization"))
         if token is None:
-            return _unauthorized_response()
+            return _unauthorized_response(request.url.path)
 
         claims = _decode_token(token)
         if claims is None:
-            return _unauthorized_response()
+            return _unauthorized_response(request.url.path)
 
         request.state.jwt_claims = claims
         request.state.user = claims
@@ -93,8 +94,14 @@ def _decode_token(token: str) -> dict[str, Any] | None:
     return claims
 
 
-def _unauthorized_response() -> JSONResponse:
+def _unauthorized_response(path: str = "") -> JSONResponse:
     """Build the generic response used for all authentication failures."""
+
+    if path.rstrip("/") == "/api/dashboard":
+        return dashboard_error(
+            401, "UNAUTHORIZED", UNAUTHORIZED_DETAIL,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return JSONResponse(
         status_code=401,
