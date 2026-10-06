@@ -53,22 +53,29 @@ Los errores conservan `X-Correlation-Id` y usan:
 La normalización de 401 y 429 se aplica solo a esta ruta para conservar los
 contratos existentes del gateway. Los mensajes no exponen excepciones internas.
 
-## Dependencia de agregación pendiente
+## Integración de la agregación
 
-La versión de `develop` utilizada no incluye la implementación del agregador.
-La integración se realiza registrando `app.state.dashboard_aggregator` durante
-el ciclo de vida de la aplicación, con el contrato asíncrono:
+El agregador de dominio `PublicationDashboardService` está disponible. La
+integración se realiza registrando `app.state.dashboard_aggregator` durante el
+ciclo de vida de la aplicación. Puede ser ese servicio o una implementación del
+contrato asíncrono del gateway:
 
 ```python
 async def aggregate(*, from_: datetime | None, to: datetime | None) -> DashboardCounts:
     ...
 ```
 
-El adaptador debe aplicar los límites UTC inclusivos sobre la fecha de negocio
-acordada con el agregador y devolver `scheduled`, `published` y `failed`. La
-fuente de datos y la fecha de negocio aún requieren el contrato del agregador;
-esta ruta no consulta endpoints inventados de otros módulos.
+`PublicationDashboardAdapter` convierte los filtros a `from_at`/`to_at` y los
+conteos de cada bucket a `DashboardCounts`. El servicio filtra por `schedule_at`
+con límites inclusivos. Un timeout HTTP de la fuente se traduce a 504; los demás
+fallos se propagan al manejo de errores del endpoint. Sigue pendiente una fuente
+productiva `PublicationSource` con el contrato acordado de M3; no se inventa un
+endpoint de colección ni se accede directamente a su base de datos.
 
 Hasta completar ese registro, una solicitud autenticada y válida devuelve 503.
-Las pruebas usan un doble asíncrono para verificar el contrato HTTP y el paso de
-filtros. No representan una integración con datos reales.
+Las pruebas unitarias y de integración cubren estados individuales y combinados,
+filtros, fechas inválidas, ausencia de publicaciones, JWT, OpenAPI y errores de
+la fuente M3. La integración usa el agregador y el adaptador reales con una fuente
+simulada sin filtrado; no representa una conexión con el servicio M3 desplegado.
+CI descubre todas estas pruebas mediante `pytest -q tests` desde `gateway` en
+pull requests y pushes a `main`, `master` o `develop`.
