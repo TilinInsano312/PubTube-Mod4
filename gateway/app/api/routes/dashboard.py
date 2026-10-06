@@ -9,7 +9,8 @@ from starlette.responses import JSONResponse
 
 from ..dashboard_models import DashboardCounts, DashboardError, DashboardQuery, DashboardResponse
 from ..errors import dashboard_error
-from ...services.dashboard import DashboardAggregator
+from ...services.dashboard import DashboardAggregator, PublicationDashboardAdapter
+from ...services.publication_dashboard import PublicationDashboardService
 
 
 router = APIRouter(tags=["dashboard"])
@@ -19,7 +20,10 @@ bearer = HTTPBearer(auto_error=False)
 def get_dashboard_aggregator(request: Request) -> DashboardAggregator | None:
     """Return the aggregator registered by the application integration."""
 
-    return getattr(request.app.state, "dashboard_aggregator", None)
+    aggregator = getattr(request.app.state, "dashboard_aggregator", None)
+    if isinstance(aggregator, PublicationDashboardService):
+        return PublicationDashboardAdapter(aggregator)
+    return aggregator
 
 
 @router.get(
