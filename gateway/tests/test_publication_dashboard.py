@@ -38,12 +38,7 @@ class FakePublicationSource:
         to_at: datetime | None = None,
     ) -> list[PublicationRecord]:
         self.bounds = (from_at, to_at)
-        return [
-            item
-            for item in self.items
-            if (from_at is None or item.schedule_at >= from_at)
-            and (to_at is None or item.schedule_at <= to_at)
-        ]
+        return self.items
 
 
 class FailingPublicationSource:
@@ -54,6 +49,18 @@ class FailingPublicationSource:
         to_at: datetime | None = None,
     ) -> list[PublicationRecord]:
         raise RuntimeError("source unavailable")
+
+
+@pytest.mark.parametrize("state", ["scheduled", "published", "failed"])
+def test_single_state_preserves_details_and_leaves_other_buckets_empty(state: str) -> None:
+    items = [record("first", state), record("second", state, 1)]
+    result = asyncio.run(PublicationDashboardService(FakePublicationSource(items)).aggregate())
+
+    for bucket_state in ("scheduled", "published", "failed"):
+        bucket = getattr(result, bucket_state)
+        expected_items = items if bucket_state == state else []
+        assert bucket.count == len(expected_items)
+        assert bucket.items == expected_items
 
 
 def test_aggregates_status_counts_and_preserves_details() -> None:
@@ -89,6 +96,8 @@ def test_from_only_is_inclusive() -> None:
     result = asyncio.run(PublicationDashboardService(source).aggregate(from_at=BASE_TIME))
 
     assert [item.id for item in result.scheduled.items] == ["edge"]
+    assert result.failed.count == 0
+    assert result.failed.items == []
     assert source.bounds == (BASE_TIME, None)
 
 
@@ -97,6 +106,8 @@ def test_to_only_is_inclusive() -> None:
     result = asyncio.run(PublicationDashboardService(source).aggregate(to_at=BASE_TIME))
 
     assert [item.id for item in result.scheduled.items] == ["edge"]
+    assert result.failed.count == 0
+    assert result.failed.items == []
     assert source.bounds == (None, BASE_TIME)
 
 
@@ -113,6 +124,39 @@ def test_from_and_to_are_inclusive() -> None:
 
     assert [item.id for item in result.scheduled.items] == ["from"]
     assert [item.id for item in result.published.items] == ["to"]
+    assert result.failed.count == 0
+    assert result.failed.items == []
+    assert source.bounds == (BASE_TIME, BASE_TIME + timedelta(days=1))
+
+
+def test_range_with_no_matching_publications_returns_empty_buckets() -> None:
+    source = FakePublicationSource(
+        [record("before", "scheduled", -1), record("after", "published", 1)]
+    )
+    result = asyncio.run(
+        PublicationDashboardService(source).aggregate(from_at=BASE_TIME, to_at=BASE_TIME)
+    )
+
+    assert result.scheduled.count == result.published.count == result.failed.count == 0
+    assert result.scheduled.items == result.published.items == result.failed.items == []
+    assert source.bounds == (BASE_TIME, BASE_TIME)
+
+
+def test_offset_bounds_compare_absolute_instants() -> None:
+    source = FakePublicationSource(
+        [record("before", "failed", -1), record("edge", "scheduled"), record("after", "failed", 1)]
+    )
+    from_at = BASE_TIME.astimezone(timezone(timedelta(hours=-3)))
+    to_at = BASE_TIME.astimezone(timezone(timedelta(hours=5, minutes=30)))
+    result = asyncio.run(
+        PublicationDashboardService(source).aggregate(from_at=from_at, to_at=to_at)
+    )
+
+    assert result.scheduled.count == 1
+    assert [item.id for item in result.scheduled.items] == ["edge"]
+    assert result.published.count == result.failed.count == 0
+    assert result.published.items == result.failed.items == []
+    assert source.bounds == (from_at, to_at)
 
 
 def test_invalid_range_is_rejected_before_source_call() -> None:
