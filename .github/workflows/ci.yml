@@ -34,8 +34,8 @@ jobs:
       - name: Lint
         run: ruff check --select E4,E7,E9,F app tests
 
-      - name: Test
-        run: pytest -q
+      - name: Test Gateway including dashboard aggregation and API
+        run: pytest -q tests
 
       - name: Build Python sources
         run: python -m compileall -q app
