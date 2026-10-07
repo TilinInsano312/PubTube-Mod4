@@ -32,7 +32,7 @@ async def schedule_publication(
         request,
         upstream_service,
         UpstreamModule.MODULE3,
-        "/publish/schedule",
+        "/api/publish/schedule",
     )
 
 
@@ -44,7 +44,7 @@ async def publish_now(
 ) -> Response:
     """Forward an immediate publication request to Module 3."""
 
-    path = f"/publish/{quote_path_segment(publication_id)}/now"
+    path = f"/api/publish/{quote_path_segment(publication_id)}/now"
     return await proxy_request(request, upstream_service, UpstreamModule.MODULE3, path)
 
 
@@ -56,5 +56,5 @@ async def publication_status(
 ) -> Response:
     """Forward a publication status query to Module 3."""
 
-    path = f"/publish/{quote_path_segment(publication_id)}/status"
+    path = f"/api/publish/{quote_path_segment(publication_id)}/status"
     return await proxy_request(request, upstream_service, UpstreamModule.MODULE3, path)

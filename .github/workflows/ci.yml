@@ -54,6 +54,23 @@ jobs:
       - name: Validate Docker Compose with alternate gateway port
         run: GATEWAY_PORT=8010 docker compose config --quiet
 
+      - name: Validate production Compose including M1 migration profile
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_db
+          MINIO_ACCESS_KEY: ci_access_key
+          MINIO_SECRET_KEY: ci_secret_key_placeholder
+          GARAGE_RPC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          GARAGE_ADMIN_TOKEN: ci_admin_token
+          M3_POSTGRES_USER: ci_m3_user
+          M3_POSTGRES_PASSWORD: ci_m3_password
+          M3_POSTGRES_DB: ci_m3_db
+        run: |
+          mkdir -p envsModulos
+          printf 'DATABASE_URL=postgresql+psycopg2://ci:ci@postgres:5432/ci\nSESSION_SECRET_KEY=ci-only\n' > envsModulos/envmodulo3
+          docker compose -f docker-compose.prod.yml --profile migrate config --quiet
+
       - name: Build gateway image
         run: docker build --tag pubtube-gateway:ci ./gateway
 

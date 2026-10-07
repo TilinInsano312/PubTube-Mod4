@@ -148,3 +148,49 @@ def test_valid_jwt_reaches_gateway_router() -> None:
     # The current Gateway has no module proxy registered, so a valid request
     # reaches FastAPI routing and receives its normal not-found response.
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/content",
+        "/api/content/health",
+        "/api/content/init",
+        "/api/publish/health",
+        "/api/publish/schedule",
+        "/api/publish/example/status",
+    ],
+)
+def test_module_routes_are_public_in_test_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    monkeypatch.setattr(settings, "public_test_routes", True)
+    test_app = FastAPI()
+    test_app.add_middleware(JWTAuthenticationMiddleware)
+
+    @test_app.get("/{route:path}")
+    def accept_route(route: str) -> dict[str, str]:
+        return {"route": route}
+
+    response = TestClient(test_app).get(path)
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("path", "public_test_routes"),
+    [
+        ("/api/content/health", False),
+        ("/api/publish/health", False),
+        ("/api/events/health", True),
+        ("/api/contentious", True),
+    ],
+)
+def test_test_mode_does_not_open_other_routes_or_override_disabled_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    public_test_routes: bool,
+) -> None:
+    monkeypatch.setattr(settings, "public_test_routes", public_test_routes)
+    response = TestClient(app).get(path)
+    assert response.status_code == 401

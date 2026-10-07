@@ -64,6 +64,10 @@ class Settings(BaseSettings):
         default="HS256",
         validation_alias="JWT_ALGORITHM",
     )
+    public_test_routes: bool = Field(
+        default=False,
+        validation_alias="GATEWAY_PUBLIC_TEST_ROUTES",
+    )
 
     rate_limit_requests: int = Field(
         default=60,

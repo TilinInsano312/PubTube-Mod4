@@ -1,6 +1,165 @@
 name: pubtube-mod4
 
 services:
+  module1-api:
+    image: ghcr.io/sebasinmas/pubtube-modulo1:develop
+    restart: unless-stopped
+    labels:
+      wud.watch: "true"
+      wud.watch.digest: "true"
+      wud.tag.include: "^develop$"
+      wud.trigger.include: dockercompose.local
+    environment:
+      NODE_ENV: production
+      PORT: "8000"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@db:5432/${POSTGRES_DB:?POSTGRES_DB required}"
+      MINIO_ENDPOINT: garage
+      MINIO_PORT: "3900"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY required}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY required}"
+      MINIO_BUCKET_CONTENT: "${MINIO_BUCKET_CONTENT:-videos}"
+      MINIO_BUCKET_THUMBNAILS: "${MINIO_BUCKET_THUMBNAILS:-thumbnails}"
+      AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+      BORRADOR_ABANDONADO_DIAS: "${BORRADOR_ABANDONADO_DIAS:-8}"
+    depends_on:
+      db:
+        condition: service_healthy
+      garage-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8000/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pubtube-network
+      - module1-internal
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}"
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB required}"
+    volumes:
+      - module1-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - module1-internal
+
+  garage:
+    image: dxflrs/garage:v2.4.1
+    restart: unless-stopped
+    entrypoint: [/garage]
+    command: [server, --single-node, --default-bucket]
+    environment:
+      GARAGE_RPC_SECRET: "${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET required}"
+      GARAGE_ADMIN_TOKEN: "${GARAGE_ADMIN_TOKEN:?GARAGE_ADMIN_TOKEN required}"
+      GARAGE_DEFAULT_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY required}"
+      GARAGE_DEFAULT_SECRET_KEY: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY required}"
+      GARAGE_DEFAULT_BUCKET: "${MINIO_BUCKET_CONTENT:-videos}"
+    volumes:
+      - ./module1/garage.toml:/etc/garage.toml:ro
+      - module1-garage-data:/var/lib/garage
+    healthcheck:
+      test: [CMD, /garage, status]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - module1-internal
+
+  garage-setup:
+    build:
+      context: ./module1
+      dockerfile: garage-setup.Dockerfile
+    restart: "no"
+    environment:
+      GARAGE_ADMIN_URL: http://garage:3903
+      GARAGE_ADMIN_TOKEN: "${GARAGE_ADMIN_TOKEN:?GARAGE_ADMIN_TOKEN required}"
+      GARAGE_S3_URL: http://garage:3900
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY required}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY required}"
+      GARAGE_MULTIPART_ABORT_DAYS: "${GARAGE_MULTIPART_ABORT_DAYS:-7}"
+      MINIO_BUCKET_CONTENT: "${MINIO_BUCKET_CONTENT:-videos}"
+      MINIO_BUCKET_THUMBNAILS: "${MINIO_BUCKET_THUMBNAILS:-thumbnails}"
+    depends_on:
+      garage:
+        condition: service_healthy
+    networks:
+      - module1-internal
+
+  module1-migrate:
+    profiles: [migrate]
+    build:
+      context: https://github.com/sebasinmas/pubtube-modulo1.git#develop
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    command: [pnpm, exec, drizzle-kit, migrate]
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:?POSTGRES_USER required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@db:5432/${POSTGRES_DB:?POSTGRES_DB required}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - module1-internal
+
+  module3-api:
+    # La imagen :develop de M3 aún no publica arm64; construir en la VPS arm64.
+    build:
+      context: https://github.com/NahuelCatrileo/DPMod3-2026.git#develop
+      dockerfile: Dockerfile
+    image: pubtube-module3:local
+    restart: unless-stopped
+    labels:
+      wud.watch: "false"
+    env_file:
+      - ./envsModulos/envmodulo3
+    environment:
+      APP_ENV: prod
+      PORT: "8000"
+    depends_on:
+      module3-db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - pubtube-network
+      - module3-internal
+
+  module3-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${M3_POSTGRES_USER:?M3_POSTGRES_USER required}"
+      POSTGRES_PASSWORD: "${M3_POSTGRES_PASSWORD:?M3_POSTGRES_PASSWORD required}"
+      POSTGRES_DB: "${M3_POSTGRES_DB:?M3_POSTGRES_DB required}"
+    volumes:
+      - module3-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      module3-internal:
+        aliases:
+          - postgres
+
   gateway:
     image: ghcr.io/tilininsano312/pubtube-mod4:develop
     restart: unless-stopped
@@ -14,9 +173,10 @@ services:
       GATEWAY_ENVIRONMENT: "${GATEWAY_ENVIRONMENT:-local}"
       MODULE1_URL: "${MODULE1_URL:-http://module1-api:8000}"
       MODULE2_URL: "${MODULE2_URL:-http://module2-api:8002}"
-      MODULE3_URL: "${MODULE3_URL:-http://module3-api:8003}"
+      MODULE3_URL: "${MODULE3_URL:-http://module3-api:8000}"
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
+      GATEWAY_PUBLIC_TEST_ROUTES: "${GATEWAY_PUBLIC_TEST_ROUTES:-true}"
       RATE_LIMIT_REQUESTS: "${RATE_LIMIT_REQUESTS:-60}"
       RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-60}"
       TRUSTED_PROXY_IPS: "${TRUSTED_PROXY_IPS:-}"
@@ -112,6 +272,10 @@ services:
 networks:
   pubtube-network:
     name: pubtube-network
+  module1-internal:
+    internal: true
+  module3-internal:
+    internal: true
 
 secrets:
   jwt_secret:
@@ -121,3 +285,6 @@ secrets:
 
 volumes:
   wud-data:
+  module1-pg-data:
+  module1-garage-data:
+  module3-pg-data:

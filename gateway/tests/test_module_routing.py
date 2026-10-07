@@ -124,17 +124,17 @@ def routing_client(
         (
             "POST",
             "/api/publish/schedule",
-            "http://module3.test/publish/schedule",
+            "http://module3.test/api/publish/schedule",
         ),
         (
             "POST",
             "/api/publish/publication-123/now",
-            "http://module3.test/publish/publication-123/now",
+            "http://module3.test/api/publish/publication-123/now",
         ),
         (
             "GET",
             "/api/publish/publication-123/status",
-            "http://module3.test/publish/publication-123/status",
+            "http://module3.test/api/publish/publication-123/status",
         ),
     ],
 )

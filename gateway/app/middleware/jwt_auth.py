@@ -36,7 +36,9 @@ class JWTAuthenticationMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Authenticate the request or return an HTTP 401 response."""
 
-        if request.url.path in PUBLIC_PATHS:
+        if request.url.path in PUBLIC_PATHS or (
+            settings.public_test_routes and _is_module_test_path(request.url.path)
+        ):
             return await call_next(request)
 
         token = _extract_bearer_token(request.headers.get("Authorization"))
@@ -53,6 +55,15 @@ class JWTAuthenticationMiddleware(BaseHTTPMiddleware):
         request.state.role = claims.get("role")
 
         return await call_next(request)
+
+
+def _is_module_test_path(path: str) -> bool:
+    """Match only M1 and M3 route prefixes while temporary tests are public."""
+
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in ("/api/content", "/api/publish")
+    )
 
 
 def _extract_bearer_token(authorization: str | None) -> str | None:

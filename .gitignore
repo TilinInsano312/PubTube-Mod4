@@ -11,6 +11,8 @@ venv/
 .env
 !.env.example
 secrets/
+/envsModulos/
+/.env.example
 
 # Graphify generated reports, graphs, caches and intermediate files
 graphify-out/
