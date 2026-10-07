@@ -50,6 +50,34 @@ Luego abrir `http://localhost:8080`. Si ya existe un reverse proxy HTTPS y una
 red privada, se puede publicar el puerto en la interfaz adecuada definiendo
 `DOZZLE_BIND_ADDRESS` en `.env`; no expongas el puerto sin HTTPS y autenticación.
 
+El túnel SSH y el login de Dozzle son credenciales distintas. La VPS tiene
+deshabilitada la autenticación por contraseña, por lo que cada persona necesita
+una clave pública autorizada en la VPS. El error
+`Permission denied (publickey)` significa que la clave usada por SSH no está
+autorizada para el usuario o que se está usando otro usuario/archivo de clave.
+
+Cada equipo debe generar su propio par y entregar únicamente el archivo `.pub`
+al administrador:
+
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/pubtube-modulo1-logs -C "modulo1-logs"
+cat ~/.ssh/pubtube-modulo1-logs.pub
+```
+
+Para M3 se puede usar otro nombre, por ejemplo
+`~/.ssh/pubtube-modulo3-logs`. La clave privada debe permanecer en el equipo
+que la generó y nunca debe enviarse por chat. El administrador debe autorizar
+las claves con una cuenta dedicada al túnel, limitada a `127.0.0.1:8080`; no se
+debe compartir una clave privada del usuario `ubuntu`, porque ese usuario tiene
+permisos administrativos y acceso al socket Docker.
+
+Cuando la clave ya esté autorizada, el equipo usa su archivo privado así:
+
+```sh
+ssh -i ~/.ssh/pubtube-modulo1-logs \
+  -N -L 8080:127.0.0.1:8080 usuario-logs@IP_DE_LA_VPS
+```
+
 Levantar el visor:
 
 ```sh
