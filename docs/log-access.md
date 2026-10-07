@@ -43,21 +43,29 @@ Por seguridad, el puerto queda ligado a `127.0.0.1` por defecto. Para usarlo
 desde el equipo administrador mediante un túnel SSH:
 
 ```sh
-ssh -N -L 8080:127.0.0.1:8080 usuario@IP_DE_LA_VPS
+ssh -N -L 8080:127.0.0.1:8080 modulo1-logs@IP_DE_LA_VPS
 ```
 
 Luego abrir `http://localhost:8080`. Si ya existe un reverse proxy HTTPS y una
 red privada, se puede publicar el puerto en la interfaz adecuada definiendo
 `DOZZLE_BIND_ADDRESS` en `.env`; no expongas el puerto sin HTTPS y autenticación.
 
-El túnel SSH y el login de Dozzle son credenciales distintas. La VPS tiene
-deshabilitada la autenticación por contraseña, por lo que cada persona necesita
-una clave pública autorizada en la VPS. El error
-`Permission denied (publickey)` significa que la clave usada por SSH no está
-autorizada para el usuario o que se está usando otro usuario/archivo de clave.
+El túnel SSH y el login de Dozzle son credenciales distintas. Se crearon las
+cuentas `modulo1-logs` y `modulo3-logs`; ambas aceptan contraseña únicamente
+dentro de su bloque `Match` de SSH y no tienen shell, `sudo`, acceso al socket
+Docker ni permisos para reenviar otros destinos. Solo pueden abrir el destino
+`127.0.0.1:8080`.
 
-Cada equipo debe generar su propio par y entregar únicamente el archivo `.pub`
-al administrador:
+Las contraseñas SSH iniciales están en
+`/opt/pubtube-mod4/secrets/log_ssh_credentials.txt`, fuera de Git y con permisos
+`600`. Las contraseñas de Dozzle están en
+`/opt/pubtube-mod4/secrets/dozzle_credentials.txt`; no son intercambiables.
+El error `Permission denied (publickey)` aparece cuando se intenta usar una
+clave con una de estas cuentas restringidas: se debe usar la contraseña SSH
+correspondiente.
+
+Si se prefiere autenticación por clave, cada equipo puede generar su propio par
+y entregar únicamente el archivo `.pub` al administrador:
 
 ```sh
 ssh-keygen -t ed25519 -f ~/.ssh/pubtube-modulo1-logs -C "modulo1-logs"
@@ -66,10 +74,9 @@ cat ~/.ssh/pubtube-modulo1-logs.pub
 
 Para M3 se puede usar otro nombre, por ejemplo
 `~/.ssh/pubtube-modulo3-logs`. La clave privada debe permanecer en el equipo
-que la generó y nunca debe enviarse por chat. El administrador debe autorizar
-las claves con una cuenta dedicada al túnel, limitada a `127.0.0.1:8080`; no se
-debe compartir una clave privada del usuario `ubuntu`, porque ese usuario tiene
-permisos administrativos y acceso al socket Docker.
+que la generó y nunca debe enviarse por chat. No se debe compartir una clave
+privada del usuario `ubuntu`, porque ese usuario tiene permisos administrativos
+y acceso al socket Docker.
 
 Cuando la clave ya esté autorizada, el equipo usa su archivo privado así:
 

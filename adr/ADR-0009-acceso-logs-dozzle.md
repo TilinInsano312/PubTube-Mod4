@@ -62,19 +62,29 @@ Dozzle escucha en `127.0.0.1:8080` en la VPS. Los equipos acceden con un túnel
 SSH:
 
 ```bash
-ssh -N -L 8080:127.0.0.1:8080 usuario@IP_DE_LA_VPS
+ssh -N -L 8080:127.0.0.1:8080 modulo1-logs@IP_DE_LA_VPS
 ```
 
 Después abren `http://localhost:8080`. No se publica el visor directamente en
 Internet; una exposición externa requiere un reverse proxy HTTPS y una política
 de firewall aprobada.
 
+La VPS tiene dos cuentas dedicadas para ese túnel: `modulo1-logs` y
+`modulo3-logs`. Sus bloques `Match` de OpenSSH habilitan autenticación por
+contraseña solo para esas cuentas, `AllowTcpForwarding local`,
+`PermitOpen 127.0.0.1:8080`, y deshabilitan shell, TTY, X11, agent forwarding y
+túneles. Las cuentas no pertenecen a `docker` ni a `sudo` y usan
+`ForceCommand /bin/false` para impedir comandos remotos.
+
 ### Credenciales y datos sensibles
 
 El hash de usuarios se mantiene en
 `/opt/pubtube-mod4/secrets/dozzle_users.yml` y las credenciales iniciales se
-entregan fuera de Git. Los archivos de la VPS tienen permisos `600`. No se
-registran contraseñas, tokens JWT, URLs con credenciales ni contenido sensible.
+entregan fuera de Git. Las credenciales SSH de las cuentas restringidas se
+mantienen en `/opt/pubtube-mod4/secrets/log_ssh_credentials.txt`; las de Dozzle
+se mantienen en `/opt/pubtube-mod4/secrets/dozzle_credentials.txt`. Todos los
+archivos tienen permisos `600`. No se registran contraseñas, tokens JWT, URLs
+con credenciales ni contenido sensible.
 
 Los usuarios de módulo ven actualmente solo los contenedores de sus APIs. Las
 bases de datos, Garage, Gateway, WUD y el socket proxy quedan fuera de sus
@@ -123,7 +133,8 @@ autenticación y firewall.
 
 - La retención queda limitada a los logs disponibles en Docker y al ciclo de
   vida de cada contenedor.
-- Los equipos necesitan una cuenta SSH o un acceso VPN para abrir el túnel.
+- Los equipos necesitan una de las cuentas SSH restringidas o un acceso VPN
+  para abrir el túnel.
 - El filtrado actual cubre las APIs, no los logs de PostgreSQL, Garage o Gateway.
 - El proxy Docker sigue siendo un componente privilegiado de infraestructura y
   debe mantenerse en una red no publicada.
