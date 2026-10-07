@@ -11,7 +11,7 @@ necesita detectar errores antes del despliegue, validar el Compose de producció
 y publicar una imagen que pueda ser descargada por la VPS sin almacenar
 credenciales ni archivos `.env` en Git.
 
-El Gateway es la imagen que publica este repositorio. M1 y M3 conservan sus
+El Gateway es la imagen que publica este repositorio. M1, M2 y M3 conservan sus
 propios repositorios y ciclos de publicación, por lo que el pipeline de M4 no
 debe intentar construir ni publicar sus imágenes.
 
@@ -93,8 +93,8 @@ sintéticos y no requieren los valores reales.
 - GitHub Actions consume tiempo adicional al construir dos arquitecturas.
 - Publicar la imagen no ejecuta migraciones ni actualiza la VPS por sí mismo;
   esas responsabilidades pertenecen al despliegue con WUD y Compose.
-- El pipeline de M4 no valida la implementación interna de M1 o M3; cada módulo
-  mantiene sus propios checks.
+- El pipeline de M4 no valida la implementación interna de M1, M2 o M3; cada
+  módulo mantiene sus propios checks.
 
 ## Referencias
 

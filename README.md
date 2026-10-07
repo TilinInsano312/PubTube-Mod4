@@ -17,10 +17,10 @@ Cada push a `develop` ejecuta CI y, si pasa, publica `ghcr.io/tilininsano312/pub
 
 ## Integración y despliegue de M1, M2 y M3
 
-M1 y M3 están definidos en el Compose de producción con bases de datos privadas. Antes del primer arranque hay que configurar los entornos privados en la VPS, ejecutar la migración Drizzle de M1 y luego levantar el stack. M3 se construye en la VPS porque su imagen pública aún carece de arm64. Los comandos, la topología, las rutas públicas y el estado de M2 están en [`docs/module-integration.md`](docs/module-integration.md). La plantilla de smoke test es [`examples/module-gateway-ci.yml`](examples/module-gateway-ci.yml).
+M1, M2 y M3 están definidos en el Compose de producción con bases de datos y broker privados. Antes del primer arranque hay que configurar los entornos privados en la VPS, ejecutar la migración Drizzle de M1 y luego levantar el stack. M3 se construye en la VPS porque su imagen pública aún carece de arm64. Los comandos, la topología y las rutas públicas están en [`docs/module-integration.md`](docs/module-integration.md). La plantilla de smoke test es [`examples/module-gateway-ci.yml`](examples/module-gateway-ci.yml).
 
-Durante las pruebas, los Compose permiten acceder a `/api/content/...` y `/api/publish/...` sin JWT mediante `GATEWAY_PUBLIC_TEST_ROUTES=true`. Al terminar, poner esa variable en `false` en el `.env` de la VPS y recrear el Gateway.
+Durante las pruebas, los Compose permiten acceder a `/api/content/...`, `/api/events/...` y `/api/publish/...` sin JWT mediante `GATEWAY_PUBLIC_TEST_ROUTES=true`. Al terminar, poner esa variable en `false` en el `.env` de la VPS y recrear el Gateway.
 
-Para que M1 y M3 consulten sus logs de la VPS hay un visor Dozzle con cuentas filtradas por módulo. La configuración y el procedimiento de alta están en [`docs/log-access.md`](docs/log-access.md).
+Para que M1, M2 y M3 consulten sus logs de la VPS hay un visor Dozzle con cuentas filtradas por módulo. La configuración y el procedimiento de alta están en [`docs/log-access.md`](docs/log-access.md).
 
 Las decisiones de arquitectura vigentes están registradas en [`adr/`](adr/): [pipeline CI/CD](adr/ADR-0007-pipeline-github-actions-ghcr.md), [despliegue en la VPS](adr/ADR-0008-despliegue-vps-compose-wud.md) y [acceso filtrado a logs](adr/ADR-0009-acceso-logs-dozzle.md).

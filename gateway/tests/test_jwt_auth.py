@@ -156,6 +156,8 @@ def test_valid_jwt_reaches_gateway_router() -> None:
         "/api/content",
         "/api/content/health",
         "/api/content/init",
+        "/api/events/health",
+        "/api/events/example",
         "/api/publish/health",
         "/api/publish/schedule",
         "/api/publish/example/status",
@@ -181,8 +183,8 @@ def test_module_routes_are_public_in_test_mode(
     ("path", "public_test_routes"),
     [
         ("/api/content/health", False),
+        ("/api/events/health", False),
         ("/api/publish/health", False),
-        ("/api/events/health", True),
         ("/api/contentious", True),
     ],
 )

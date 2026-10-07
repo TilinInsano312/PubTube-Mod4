@@ -58,11 +58,11 @@ class JWTAuthenticationMiddleware(BaseHTTPMiddleware):
 
 
 def _is_module_test_path(path: str) -> bool:
-    """Match only M1 and M3 route prefixes while temporary tests are public."""
+    """Match module route prefixes while temporary tests are public."""
 
     return any(
         path == prefix or path.startswith(f"{prefix}/")
-        for prefix in ("/api/content", "/api/publish")
+        for prefix in ("/api/content", "/api/events", "/api/publish")
     )
 
 

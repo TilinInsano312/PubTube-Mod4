@@ -17,13 +17,17 @@ docker run --rm -it amir20/dozzle:v11.3.0 generate modulo1 \
   --name "Equipo M1" \
   --user-filter "label=pubtube.logs.module=module1" \
   --user-roles none > /tmp/dozzle-m1.yml
+docker run --rm -it amir20/dozzle:v11.3.0 generate modulo2 \
+  --name "Equipo M2" \
+  --user-filter "label=pubtube.logs.module=module2" \
+  --user-roles none > /tmp/dozzle-m2.yml
 docker run --rm -it amir20/dozzle:v11.3.0 generate modulo3 \
   --name "Equipo M3" \
   --user-filter "label=pubtube.logs.module=module3" \
   --user-roles none > /tmp/dozzle-m3.yml
 ```
 
-Cada comando pide una contraseña. Combinar los dos usuarios bajo una sola
+Cada comando pide una contraseña. Combinar los tres usuarios bajo una sola
 clave `users:` en `secrets/dozzle_users.yml`, usando la plantilla
 [`dozzle-users.yml.example`](dozzle-users.yml.example), y eliminar los
 temporales. El archivo debe quedar así protegido:
@@ -32,10 +36,11 @@ temporales. El archivo debe quedar así protegido:
 chmod 600 /opt/pubtube-mod4/secrets/dozzle_users.yml
 ```
 
-El `filter` de cada usuario es el límite de visibilidad. M1 solo verá el
-contenedor etiquetado `pubtube.logs.module=module1`; M3 solo verá el de M3.
-Las bases, Garage, Gateway, WUD y el proxy del socket no aparecen para esas
-cuentas.
+El `filter` de cada usuario es el límite de visibilidad. M1, M2 y M3 solo
+verán los contenedores etiquetados con su propio valor de
+`pubtube.logs.module`; M2 incluye su API y su consumidor de Event Store. Las
+bases, RabbitMQ, Garage, Gateway, WUD y el proxy del socket no aparecen para
+esas cuentas.
 
 ## Arranque
 
@@ -50,11 +55,11 @@ Luego abrir `http://localhost:8080`. Si ya existe un reverse proxy HTTPS y una
 red privada, se puede publicar el puerto en la interfaz adecuada definiendo
 `DOZZLE_BIND_ADDRESS` en `.env`; no expongas el puerto sin HTTPS y autenticación.
 
-El túnel SSH y el login de Dozzle son credenciales distintas. Se crearon las
-cuentas `modulo1-logs` y `modulo3-logs`; ambas aceptan contraseña únicamente
-dentro de su bloque `Match` de SSH y no tienen shell, `sudo`, acceso al socket
-Docker ni permisos para reenviar otros destinos. Solo pueden abrir el destino
-`127.0.0.1:8080`.
+El túnel SSH y el login de Dozzle son credenciales distintas. Las cuentas
+dedicadas son `modulo1-logs`, `modulo2-logs` y `modulo3-logs`; deben aceptar
+contraseña únicamente dentro de su bloque `Match` de SSH y no tener shell,
+`sudo`, acceso al socket Docker ni permisos para reenviar otros destinos. Solo
+pueden abrir el destino `127.0.0.1:8080`.
 
 Las contraseñas SSH iniciales están en
 `/opt/pubtube-mod4/secrets/log_ssh_credentials.txt`, fuera de Git y con permisos
@@ -77,6 +82,9 @@ Para M3 se puede usar otro nombre, por ejemplo
 que la generó y nunca debe enviarse por chat. No se debe compartir una clave
 privada del usuario `ubuntu`, porque ese usuario tiene permisos administrativos
 y acceso al socket Docker.
+
+Para M2, usar por ejemplo
+`~/.ssh/pubtube-modulo2-logs` y la cuenta SSH `modulo2-logs`.
 
 Cuando la clave ya esté autorizada, el equipo usa su archivo privado así:
 

@@ -5,8 +5,8 @@
 
 ## Contexto
 
-La integración de M1 y M3 debe ejecutarse en una VPS `linux/arm64` con
-persistencia para PostgreSQL y Garage. Las APIs de los módulos deben ser
+La integración de M1, M2 y M3 debe ejecutarse en una VPS `linux/arm64` con
+persistencia para PostgreSQL, RabbitMQ y Garage. Las APIs de los módulos deben ser
 accesibles desde el Gateway sin publicar sus puertos directamente en Internet.
 También se necesita actualizar automáticamente las imágenes públicas que sí
 son compatibles con el flujo de `develop`, sin mover los archivos de entorno de
@@ -14,7 +14,7 @@ los módulos al repositorio.
 
 M1 publica una imagen pública para `develop`. M3 todavía necesita construirse en
 la VPS desde su rama pública porque su imagen no cubre `arm64`. El Gateway de
-M4 se publica en GHCR para ambas arquitecturas.
+M4 y M2 se publican en GHCR para ambas arquitecturas.
 
 ## Decisión
 
@@ -25,22 +25,25 @@ Se utiliza un único Compose de producción en
 
 - El Gateway es el único servicio de los módulos que publica el puerto HTTP
   externo (`8000` por defecto).
-- M1 y M3 se conectan a `pubtube-network` para recibir tráfico del Gateway,
-  pero sus bases de datos permanecen en `module1-internal` y
-  `module3-internal`.
-- PostgreSQL de M1, PostgreSQL de M3 y Garage usan volúmenes Docker persistentes.
+- M1, M2 y M3 se conectan a `pubtube-network` para recibir tráfico del Gateway,
+  pero sus bases de datos, Garage y RabbitMQ permanecen en redes internas.
+- PostgreSQL de M1, PostgreSQL de M2, PostgreSQL de M3, RabbitMQ y Garage usan
+  volúmenes Docker persistentes.
 - Las migraciones de M1 se ejecutan mediante el perfil explícito `migrate`.
 - M3 ejecuta sus migraciones Alembic al iniciar su API.
+- M2 ejecuta un consumidor de Event Store separado que declara la topología de
+  RabbitMQ y persiste los eventos en su PostgreSQL.
 
 ### Imágenes y actualización
 
 - Gateway: `ghcr.io/tilininsano312/pubtube-mod4:develop`, publicado para
   `amd64` y `arm64`.
 - M1: `ghcr.io/sebasinmas/pubtube-modulo1:develop`, vigilado por WUD.
+- M2: `ghcr.io/carloscienfuegos1/pubtube-modulo2:develop`, vigilado por WUD.
 - M3: imagen local construida en la VPS desde su repositorio público; WUD no la
   actualiza automáticamente.
-- WUD vigila el tag `develop` y su digest para Gateway y M1, y ejecuta el
-  trigger de Compose local en la VPS.
+- WUD vigila el tag `develop` y su digest para Gateway, M1 y los servicios de
+  M2, y ejecuta el trigger de Compose local en la VPS.
 
 Las actualizaciones que cambien el esquema de M1 requieren ejecutar la
 migración coordinada con la versión correspondiente de la API. Actualizar una
@@ -51,6 +54,7 @@ imagen no sustituye ese paso.
 Los valores reales se mantienen fuera de Git:
 
 - `/opt/pubtube-mod4/.env` para variables de Compose y M1.
+- `/opt/pubtube-mod4/envsModulos/envmodulo2` para las credenciales de M2.
 - `/opt/pubtube-mod4/envsModulos/envmodulo3` para el entorno privado de M3.
 - `/opt/pubtube-mod4/secrets/` para secretos de Docker Compose.
 
@@ -60,9 +64,9 @@ se copian al repositorio ni se incluyen en una imagen Docker.
 ### Rutas de prueba
 
 Durante la integración de los módulos, la VPS usa
-`GATEWAY_PUBLIC_TEST_ROUTES=true` para permitir pruebas de las rutas de M1 y M3
-sin JWT. Antes de considerar el entorno productivo, esa variable debe quedar en
-`false` y el Gateway debe recrearse.
+`GATEWAY_PUBLIC_TEST_ROUTES=true` para permitir pruebas de las rutas de M1, M2 y
+M3 sin JWT. Antes de considerar el entorno productivo, esa variable debe quedar
+en `false` y el Gateway debe recrearse.
 
 ## Alternativas consideradas
 
@@ -95,7 +99,7 @@ con un esquema incompatible.
 - El entorno completo se levanta y se inspecciona con Docker Compose.
 - Los módulos no exponen sus APIs ni bases de datos directamente al host.
 - Los datos sobreviven a la recreación de contenedores mediante volúmenes.
-- WUD reduce el trabajo manual para Gateway y M1.
+- WUD reduce el trabajo manual para Gateway, M1 y M2.
 - Los secretos de la VPS quedan fuera del historial del repositorio.
 - La estrategia funciona con la arquitectura `arm64` disponible en la VPS.
 

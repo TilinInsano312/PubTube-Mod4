@@ -5,7 +5,7 @@
 
 ## Contexto
 
-Los equipos de M1 y M3 necesitan revisar los logs de sus APIs directamente en
+Los equipos de M1, M2 y M3 necesitan revisar los logs de sus APIs directamente en
 la VPS para diagnosticar errores. Darles acceso SSH con permisos Docker o
 montar `/var/run/docker.sock` en una interfaz web les permitiría inspeccionar o
 modificar todos los contenedores del host.
@@ -40,6 +40,7 @@ VPS. Cada cuenta usa un filtro por etiqueta:
 | Cuenta | Filtro | Visibilidad actual |
 |---|---|---|
 | `modulo1` | `label=pubtube.logs.module=module1` | `module1-api` |
+| `modulo2` | `label=pubtube.logs.module=module2` | `module2-api`, `module2-event-store` |
 | `modulo3` | `label=pubtube.logs.module=module3` | `module3-api` |
 
 Las cuentas tienen `roles: none`, por lo que pueden consultar logs sin iniciar,
@@ -54,7 +55,7 @@ labels:
   pubtube.logs.module: "module1"
 ```
 
-El mismo patrón se usa para M3.
+El mismo patrón se usa para M2 y M3.
 
 ### Exposición de red
 
@@ -69,8 +70,8 @@ Después abren `http://localhost:8080`. No se publica el visor directamente en
 Internet; una exposición externa requiere un reverse proxy HTTPS y una política
 de firewall aprobada.
 
-La VPS tiene dos cuentas dedicadas para ese túnel: `modulo1-logs` y
-`modulo3-logs`. Sus bloques `Match` de OpenSSH habilitan autenticación por
+La VPS tiene tres cuentas dedicadas para ese túnel: `modulo1-logs`,
+`modulo2-logs` y `modulo3-logs`. Sus bloques `Match` de OpenSSH habilitan autenticación por
 contraseña solo para esas cuentas, `AllowTcpForwarding local`,
 `PermitOpen 127.0.0.1:8080`, y deshabilitan shell, TTY, X11, agent forwarding y
 túneles. Las cuentas no pertenecen a `docker` ni a `sudo` y usan
@@ -121,7 +122,7 @@ autenticación y firewall.
 
 ### Positivas
 
-- M1 y M3 pueden ver sus logs en vivo sin acceso Docker global.
+- M1, M2 y M3 pueden ver sus logs en vivo sin acceso Docker global.
 - El filtrado por etiquetas evita que una cuenta vea los contenedores de otro
   módulo.
 - El socket proxy reduce las operaciones Docker disponibles para el visor.

@@ -115,6 +115,100 @@ services:
     networks:
       - module1-internal
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+    env_file:
+      - ./envsModulos/envmodulo2
+    entrypoint: [/bin/sh, -c]
+    command:
+      - >-
+        export RABBITMQ_DEFAULT_USER="$${RABBITMQ_USER}";
+        export RABBITMQ_DEFAULT_PASS="$${RABBITMQ_PASS}";
+        exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server
+    volumes:
+      - module2-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - module2-internal
+
+  module2-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ./envsModulos/envmodulo2
+    volumes:
+      - module2-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - module2-internal
+
+  module2-api:
+    image: ghcr.io/carloscienfuegos1/pubtube-modulo2:develop
+    restart: unless-stopped
+    labels:
+      wud.watch: "true"
+      wud.watch.digest: "true"
+      wud.tag.include: "^develop$"
+      wud.trigger.include: dockercompose.local
+      pubtube.logs.module: "module2"
+    env_file:
+      - ./envsModulos/envmodulo2
+    environment:
+      PORT: "8002"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      POSTGRES_HOST: module2-db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      module2-db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pubtube-network
+      - module2-internal
+
+  module2-event-store:
+    image: ghcr.io/carloscienfuegos1/pubtube-modulo2:develop
+    restart: unless-stopped
+    labels:
+      wud.watch: "true"
+      wud.watch.digest: "true"
+      wud.tag.include: "^develop$"
+      wud.trigger.include: dockercompose.local
+      pubtube.logs.module: "module2"
+    env_file:
+      - ./envsModulos/envmodulo2
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      POSTGRES_HOST: module2-db
+      POSTGRES_PORT: "5432"
+    command: [sh, -c, "python src/setup_rabbitmq.py && exec python src/event_store_consumer.py"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      module2-db:
+        condition: service_healthy
+    networks:
+      - module2-internal
+
   module3-api:
     # La imagen :develop de M3 aún no publica arm64; construir en la VPS arm64.
     build:
@@ -320,6 +414,8 @@ networks:
     name: pubtube-network
   module1-internal:
     internal: true
+  module2-internal:
+    internal: true
   module3-internal:
     internal: true
   logs-internal:
@@ -338,5 +434,7 @@ volumes:
   wud-data:
   module1-pg-data:
   module1-garage-data:
+  module2-pg-data:
+  module2-rabbitmq-data:
   module3-pg-data:
   dozzle-data:

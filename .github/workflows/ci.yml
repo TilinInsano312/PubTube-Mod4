@@ -69,6 +69,7 @@ jobs:
         run: |
           mkdir -p envsModulos
           printf 'DATABASE_URL=postgresql+psycopg2://ci:ci@postgres:5432/ci\nSESSION_SECRET_KEY=ci-only\n' > envsModulos/envmodulo3
+          printf 'RABBITMQ_USER=ci_m2_rabbit\nRABBITMQ_PASS=ci_m2_rabbit_password\nPOSTGRES_DB=ci_m2_events\nPOSTGRES_USER=ci_m2_user\nPOSTGRES_PASSWORD=ci_m2_password\n' > envsModulos/envmodulo2
           docker compose -f docker-compose.prod.yml --profile migrate config --quiet
 
       - name: Build gateway image
