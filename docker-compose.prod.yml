@@ -9,6 +9,7 @@ services:
       wud.watch.digest: "true"
       wud.tag.include: "^develop$"
       wud.trigger.include: dockercompose.local
+      pubtube.logs.module: "module1"
     environment:
       NODE_ENV: production
       PORT: "8000"
@@ -123,6 +124,7 @@ services:
     restart: unless-stopped
     labels:
       wud.watch: "false"
+      pubtube.logs.module: "module3"
     env_file:
       - ./envsModulos/envmodulo3
     environment:
@@ -269,6 +271,50 @@ services:
     labels:
       wud.watch: "false"
 
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    privileged: true
+    environment:
+      # Dozzle necesita listar contenedores, leer sus logs, recibir eventos y
+      # consultar información básica del daemon. Todo lo demás queda cerrado.
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - logs-internal
+
+  dozzle:
+    image: amir20/dozzle:v11.3.0
+    restart: unless-stopped
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
+    environment:
+      DOZZLE_AUTH_PROVIDER: simple
+      DOZZLE_AUTH_TTL: "24h"
+      DOZZLE_ENABLE_ACTIONS: "false"
+      DOZZLE_ENABLE_SHELL: "false"
+      DOZZLE_ENABLE_MCP: "false"
+      DOZZLE_DISABLE_SETUP_WIZARD: "true"
+      DOZZLE_DISABLE_AVATARS: "true"
+      DOZZLE_NO_ANALYTICS: "true"
+      DOZZLE_HOSTNAME: pubtube-vps
+      DOZZLE_REMOTE_HOST: "tcp://docker-socket-proxy:2375|pubtube-vps"
+    ports:
+      - "${DOZZLE_BIND_ADDRESS:-127.0.0.1}:${DOZZLE_PORT:-8080}:8080"
+    secrets:
+      - source: dozzle_users
+        target: /data/users.yml
+    volumes:
+      - dozzle-data:/data
+    networks:
+      - logs-internal
+      - logs-public
+
 networks:
   pubtube-network:
     name: pubtube-network
@@ -276,15 +322,21 @@ networks:
     internal: true
   module3-internal:
     internal: true
+  logs-internal:
+    internal: true
+  logs-public:
 
 secrets:
   jwt_secret:
     file: ./secrets/jwt_secret
   wud_admin_password:
     file: ./secrets/wud_admin_password
+  dozzle_users:
+    file: ./secrets/dozzle_users.yml
 
 volumes:
   wud-data:
   module1-pg-data:
   module1-garage-data:
   module3-pg-data:
+  dozzle-data:

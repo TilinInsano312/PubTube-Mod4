@@ -1,0 +1,23 @@
+# Plantilla para /opt/pubtube-mod4/secrets/dozzle_users.yml.
+# Generar los hashes con la imagen de Dozzle; no pongas contraseñas en Git.
+#
+# docker run --rm amir20/dozzle:v11.3.0 generate modulo1 \
+#   --name "Equipo M1" \
+#   --user-filter "label=pubtube.logs.module=module1" \
+#   --user-roles none
+#
+# Repite el comando para modulo3 y combina ambos usuarios bajo `users:`.
+# `roles: none` permite consultar y descargar logs, pero no iniciar, detener,
+# eliminar contenedores ni abrir una terminal.
+
+users:
+  modulo1:
+    name: Equipo M1
+    password: REEMPLAZAR_POR_HASH_BCRYPT
+    filter: label=pubtube.logs.module=module1
+    roles: none
+  modulo3:
+    name: Equipo M3
+    password: REEMPLAZAR_POR_HASH_BCRYPT
+    filter: label=pubtube.logs.module=module3
+    roles: none

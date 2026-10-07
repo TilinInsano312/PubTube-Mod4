@@ -64,6 +64,8 @@ WUD monta `/opt/pubtube-mod4` en la misma ruta para que el trigger de Compose en
 
 M1 y M3 están en el mismo Compose. Sus APIs usan `module1-api` y `module3-api` en `pubtube-network`; sus bases PostgreSQL y Garage están en redes internas y volúmenes independientes. Ninguna API de módulo publica puertos al host. M3 aplica sus propias migraciones Alembic al arrancar. Para M2, agregar la API en `pubtube-network` y mantener RabbitMQ en una red privada.
 
+El visor de logs para los equipos está documentado en [`docs/log-access.md`](log-access.md). Cada cuenta de Dozzle queda filtrada por la etiqueta de su API y solo tiene permisos de lectura de logs.
+
 M1 requiere variables de entorno para PostgreSQL y Garage. Crear `/opt/pubtube-mod4/.env` con `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `GARAGE_RPC_SECRET` y `GARAGE_ADMIN_TOKEN`; restringirlo con `chmod 600`. Las credenciales facilitadas para desarrollo se guardaron solo en el `.env` local ignorado por Git; para producción deben sustituirse por valores nuevos. `DATABASE_URL` se construye dentro del Compose con el host privado `db:5432`. Los secretos JWT y WUD siguen en archivos bajo `secrets/`.
 
 El primer despliegue requiere las migraciones Drizzle: la imagen pública `:develop` de M1 solo contiene las dependencias de producción y no incluye `drizzle-kit`. El perfil `migrate` construye temporalmente la etapa `builder` desde la rama `develop` pública de M1. Ejecutar desde `/opt/pubtube-mod4`:
