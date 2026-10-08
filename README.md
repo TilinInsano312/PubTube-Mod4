@@ -2,8 +2,43 @@
 
 ## API del dashboard
 
-`GET /api/dashboard` acepta filtros opcionales `from` y `to`, valida fechas y
-requiere JWT. Consulta el [contrato y la integración pendiente del agregador](docs/dashboard-api.md).
+El backend del dashboard vive en [`dashboard-api/`](dashboard-api/README.md),
+como servicio FastAPI independiente. El Gateway reenvía `GET /api/dashboard`
+a ese servicio mediante `DASHBOARD_URL`, conservando filtros, errores y trazabilidad.
+Esta ruta es pública y no valida JWT; mantiene rate limiting. Las demás rutas
+conservan sus reglas de autenticación.
+
+Consulta el [contrato y la integración pendiente con M3](docs/dashboard-api.md).
+Sin una fuente de publicaciones registrada, devuelve 503; eso no equivale a un
+dashboard vacío.
+
+## Ejecutar y verificar el backend en local
+
+Con Docker Desktop iniciado, ejecutar `docker compose up --build -d`.
+Swagger del Gateway está en <http://localhost:8000/docs>, su salud en
+<http://localhost:8000/api/health> y la consulta pública del dashboard en
+<http://localhost:8000/api/dashboard>. El servicio `dashboard-api` usa el puerto
+interno 8004 y no publica un puerto en el host. Este Compose local levanta los
+backends del módulo D y observabilidad; M1/M2/M3 se integran mediante sus URLs.
+
+Para ejecutar ambos servicios sin Docker, desde la raíz y con Python 3.12:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r gateway/requirements-dev.txt -r dashboard-api/requirements-dev.txt
+```
+
+En dos terminales independientes:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn dashboard_app.main:app --app-dir dashboard-api --host 127.0.0.1 --port 8004 --no-access-log
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir gateway --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+`DASHBOARD_URL` usa `http://localhost:8004` por defecto fuera de Docker. Las
+variables de cada servicio están descritas en su `.env.example`. Desde la raíz,
+`.\.venv\Scripts\python.exe -m pytest -q` ejecuta las pruebas de Gateway,
+dashboard e integración. El frontend aún no está implementado.
 
 ## Prometheus local
 
@@ -13,7 +48,14 @@ Los futuros targets de M1/M2/M3 se agregan como jobs en `prometheus/prometheus.y
 
 ## Despliegue automático de `develop`
 
-Cada push a `develop` ejecuta CI y, si pasa, publica `ghcr.io/tilininsano312/pubtube-mod4:develop` con el `GITHUB_TOKEN` del workflow. La VPS usa [docker-compose.prod.yml](docker-compose.prod.yml) y WUD para actualizar el Gateway cuando cambia el digest de la imagen. El secreto JWT se crea y conserva únicamente en la VPS. La instalación y los pasos pendientes para M1/M2/M3 están en [la guía de integración](docs/module-integration.md).
+Cada push a `develop` ejecuta CI y, si pasa, publica las imágenes
+`ghcr.io/tilininsano312/pubtube-mod4:develop` (Gateway) y
+`ghcr.io/tilininsano312/pubtube-mod4:dashboard-develop` (Dashboard) con el
+`GITHUB_TOKEN` del workflow. La VPS usa [docker-compose.prod.yml](docker-compose.prod.yml)
+y WUD para actualizar cada servicio cuando cambia su digest. El secreto JWT
+se crea y conserva únicamente en la VPS y solo se monta en el Gateway. La
+instalación y los pasos pendientes para M1/M2/M3 están en
+[la guía de integración](docs/module-integration.md).
 
 ## Integración y despliegue de M1, M2 y M3
 

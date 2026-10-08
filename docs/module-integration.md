@@ -57,6 +57,20 @@ curl -fsS http://localhost:8000/api/publish/health
 
 Las ramas por defecto son `main`: cada equipo debe usar `develop` para activar la publicación. WUD actualiza M1, M2 y el Gateway cuando cambia el digest de sus imágenes `:develop`; M3 continúa construyéndose localmente en la VPS.
 
+## Servicio Dashboard del módulo D
+
+El Dashboard se construye y publica por separado del Gateway con el tag
+`ghcr.io/tilininsano312/pubtube-mod4:dashboard-develop`. El Compose de producción
+lo conecta a la misma red privada y WUD vigila su digest de forma independiente.
+El puerto `DASHBOARD_PORT` (8004 por defecto) no se publica en el host; el
+Gateway usa `DASHBOARD_URL=http://dashboard-api:<puerto>`.
+
+`GET /api/dashboard` es público y mantiene rate limiting, independientemente
+de `GATEWAY_PUBLIC_TEST_ROUTES`. M1/M2/M3 conservan sus reglas existentes. El
+Dashboard no monta secretos JWT. Una consulta válida devuelve 503 mientras
+no se registre una fuente de publicaciones de M3 según el contrato acordado.
+El contrato y los pasos de integración están en [dashboard-api.md](dashboard-api.md).
+
 ## VPS
 
 Instalar [docker-compose.prod.yml](../docker-compose.prod.yml) en `/opt/pubtube-mod4` junto con los archivos de observabilidad. Crear `/opt/pubtube-mod4/secrets/jwt_secret` y `/opt/pubtube-mod4/secrets/wud_admin_password` con valores aleatorios y permisos restringidos antes del primer arranque. El Gateway lee `/run/secrets/jwt_secret` mediante `JWT_SECRET_FILE`; WUD usa el segundo archivo para crear su administrador inicial. `secrets/` está ignorado por Git.
