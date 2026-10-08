@@ -35,6 +35,32 @@ wait_for_http_200 "Gateway" "${gateway_base}/api/health"
 wait_for_http_200 "Prometheus" "${prometheus_base}/-/healthy"
 wait_for_http_200 "Jaeger" "${jaeger_base}/api/services"
 
+docker compose exec -T dashboard-api python -c \
+  'import os, urllib.request; port = os.environ["DASHBOARD_PORT"]; urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=5)' \
+  || fail "Dashboard internal healthcheck failed"
+printf 'PASS: Dashboard is healthy on its private service port\n'
+
+dashboard_result="$(mktemp)"
+dashboard_status="$(curl --silent --show-error --max-time 10 \
+  -H 'X-Correlation-Id: ci-dashboard-smoke' \
+  --output "$dashboard_result" --write-out '%{http_code}' \
+  "${gateway_base}/api/dashboard?from=invalid")" \
+  || fail "Could not request Dashboard through Gateway"
+if [[ "$dashboard_status" != "422" ]]; then
+  rm -f "$dashboard_result"
+  fail "Public Dashboard must validate dates without JWT; expected 422, got $dashboard_status"
+fi
+python3 - "$dashboard_result" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    response = json.load(source)
+assert response.get("status") == "error"
+assert response.get("code") == "INVALID_DATE_RANGE"
+PY
+rm -f "$dashboard_result"
+printf 'PASS: Public Dashboard validates dates through Gateway without JWT\n'
+
 curl --silent --show-error --fail --max-time 10 \
   -H 'X-Correlation-Id: ci-trace-smoke' \
   "${gateway_base}/api/health" --output /dev/null \
@@ -104,22 +130,22 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as source:
     data = json.load(source)
 targets = data.get("data", {}).get("activeTargets", [])
-if any(
-    target.get("labels", {}).get("job") == "pubtube-gateway"
-    and target.get("health") == "up"
-    for target in targets
-):
+healthy_jobs = {
+    target.get("labels", {}).get("job") for target in targets
+    if target.get("health") == "up"
+}
+if {"pubtube-gateway", "pubtube-dashboard"} <= healthy_jobs:
     raise SystemExit(0)
 raise SystemExit(1)
 PY
   then
     rm -f "$targets_file"
-    printf 'PASS: Prometheus target pubtube-gateway is up\n'
+    printf 'PASS: Prometheus targets pubtube-gateway and pubtube-dashboard are up\n'
     break
   fi
   rm -f "$targets_file"
   if (( SECONDS >= deadline )); then
-    fail "Prometheus target pubtube-gateway did not become up within ${deadline_seconds}s"
+    fail "Prometheus Gateway and Dashboard targets did not become up within ${deadline_seconds}s"
   fi
   sleep "$poll_seconds"
 done
