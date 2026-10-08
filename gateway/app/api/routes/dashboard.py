@@ -1,85 +1,64 @@
-"""Authenticated dashboard endpoint and temporal filter validation."""
+"""Public forwarding route for the independently deployed dashboard API."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.security import HTTPBearer
-from pydantic import ValidationError
-from starlette.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query, Request, Response
 
-from ..dashboard_models import DashboardCounts, DashboardError, DashboardQuery, DashboardResponse
-from ..errors import dashboard_error
-from ...services.dashboard import DashboardAggregator, PublicationDashboardAdapter
-from ...services.publication_dashboard import PublicationDashboardService
-
+from ..dependencies import get_upstream_service
+from ..errors import standard_error
+from ...clients.errors import UpstreamError, UpstreamTimeoutError
+from ...services.upstreams import UpstreamModule, UpstreamService
+from .proxy import _response_from_upstream
 
 router = APIRouter(tags=["dashboard"])
-bearer = HTTPBearer(auto_error=False)
 
-
-def get_dashboard_aggregator(request: Request) -> DashboardAggregator | None:
-    """Return the aggregator registered by the application integration."""
-
-    aggregator = getattr(request.app.state, "dashboard_aggregator", None)
-    if isinstance(aggregator, PublicationDashboardService):
-        return PublicationDashboardAdapter(aggregator)
-    return aggregator
+# HTTP boundary documentation only. Validation and aggregation belong to dashboard-api.
+ERROR_SCHEMA = {
+    "type": "object", "required": ["status", "code", "message"],
+    "properties": {
+        "status": {"type": "string", "enum": ["error"]},
+        "code": {"type": "string"}, "message": {"type": "string"},
+    },
+}
+COUNT_SCHEMA = {
+    "type": "object", "required": ["scheduled", "published", "failed"],
+    "properties": {name: {"type": "integer", "minimum": 0} for name in ("scheduled", "published", "failed")},
+}
 
 
 @router.get(
     "/dashboard",
-    response_model=DashboardResponse,
     summary="Get aggregated publication states",
-    description=(
-        "Returns scheduled, published and failed counts. Filters are optional and "
-        "inclusive. Use YYYY-MM-DD (whole UTC days) or ISO timestamps with a timezone. "
-        "JWT authentication is enforced by the Gateway middleware."
-    ),
-    dependencies=[Depends(bearer)],
+    description="Public endpoint, without JWT. Inclusive from/to filters are validated by dashboard-api.",
     responses={
-        401: {"model": DashboardError, "description": "Missing or invalid JWT"},
-        422: {"model": DashboardError, "description": "Invalid date or reversed range"},
-        429: {"model": DashboardError, "description": "Rate limit exceeded"},
-        500: {"model": DashboardError, "description": "Aggregation failed"},
-        503: {"model": DashboardError, "description": "Aggregator unavailable"},
-        504: {"model": DashboardError, "description": "Aggregation timed out"},
+        200: {"content": {"application/json": {"schema": {
+            "type": "object", "required": ["status", "data"],
+            "properties": {"status": {"type": "string", "enum": ["ok"]}, "data": COUNT_SCHEMA},
+        }}}},
+        **{code: {"description": description, "content": {"application/json": {"schema": ERROR_SCHEMA}}}
+           for code, description in {
+               422: "Invalid date or range", 429: "Rate limit exceeded",
+               500: "Aggregation failed", 503: "Dashboard or publication source unavailable",
+               504: "Dashboard or publication source timed out",
+           }.items()},
     },
 )
 async def get_dashboard(
-    from_: Annotated[
-        str | None,
-        Query(alias="from", description="Inclusive start: YYYY-MM-DD or timestamp with timezone"),
-    ] = None,
-    to: Annotated[
-        str | None,
-        Query(description="Inclusive end: YYYY-MM-DD or timestamp with timezone"),
-    ] = None,
-    aggregator: DashboardAggregator | None = Depends(get_dashboard_aggregator),
-) -> DashboardResponse | JSONResponse:
-    """Validate the temporal range and request aggregated publication counts."""
-
+    request: Request,
+    from_: Annotated[str | None, Query(alias="from", description="Inclusive start date or timestamp")] = None,
+    to: Annotated[str | None, Query(description="Inclusive end date or timestamp")] = None,
+    upstream_service: UpstreamService = Depends(get_upstream_service),
+) -> Response:
+    """Forward filters and headers without importing dashboard business code."""
     try:
-        filters = DashboardQuery.model_validate({"from": from_, "to": to})
-    except (ValidationError, OverflowError):
-        return dashboard_error(
-            422,
-            "INVALID_DATE_RANGE",
-            "Use valid ISO dates or timestamps with timezone, with from <= to",
+        response = await upstream_service.client_for(UpstreamModule.DASHBOARD).request(
+            method="GET", path="/api/dashboard",
+            headers=request.headers, params=list(request.query_params.multi_items()),
+            correlation_id=getattr(request.state, "correlation_id", None),
+            raise_for_status=False,
         )
-
-    if aggregator is None:
-        return dashboard_error(
-            503, "DASHBOARD_UNAVAILABLE", "Dashboard aggregation is not available"
-        )
-
-    try:
-        counts = await aggregator.aggregate(from_=filters.from_, to=filters.to)
-        return DashboardResponse(data=DashboardCounts.model_validate(counts))
-    except TimeoutError:
-        return dashboard_error(
-            504, "DASHBOARD_TIMEOUT", "Dashboard aggregation timed out"
-        )
-    except Exception:
-        return dashboard_error(
-            500, "DASHBOARD_ERROR", "Dashboard aggregation failed"
-        )
+    except UpstreamTimeoutError:
+        return standard_error(504, "DASHBOARD_TIMEOUT", "Dashboard request timed out")
+    except (UpstreamError, ValueError):
+        return standard_error(503, "DASHBOARD_UNAVAILABLE", "Dashboard service is not available")
+    return _response_from_upstream(response)

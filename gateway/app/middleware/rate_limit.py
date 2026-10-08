@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from ..core.config import settings
-from ..api.errors import dashboard_error
+from ..api.errors import standard_error
 
 
 RATE_LIMIT_EXCLUDED_PATHS = frozenset(
@@ -142,7 +142,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not decision.allowed:
             headers["Retry-After"] = str(decision.retry_after_seconds)
             if request.url.path.rstrip("/") == "/api/dashboard":
-                return dashboard_error(
+                return standard_error(
                     429, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded", headers=headers
                 )
             return JSONResponse(

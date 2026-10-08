@@ -1,11 +1,8 @@
-"""Standard error responses for the dashboard HTTP contract."""
+"""Standard error envelopes for public HTTP contracts."""
 
 from starlette.responses import JSONResponse
 
-from .dashboard_models import DashboardError
-
-
-def dashboard_error(
+def standard_error(
     status_code: int,
     code: str,
     message: str,
@@ -15,6 +12,6 @@ def dashboard_error(
 
     return JSONResponse(
         status_code=status_code,
-        content=DashboardError(code=code, message=message).model_dump(),
+        content={"status": "error", "code": code, "message": message},
         headers=headers,
     )

@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     )
     gateway_port: int = Field(default=8000, validation_alias="GATEWAY_PORT")
 
+    dashboard_url: str = Field(
+        default="http://localhost:8004",
+        validation_alias="DASHBOARD_URL",
+    )
+
     module1_url: str = Field(
         default="http://localhost:8001",
         validation_alias="MODULE1_URL",

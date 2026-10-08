@@ -15,6 +15,7 @@ class UpstreamModule(StrEnum):
     MODULE1 = "module1"
     MODULE2 = "module2"
     MODULE3 = "module3"
+    DASHBOARD = "dashboard"
 
 
 class UpstreamService:
@@ -35,6 +36,7 @@ class UpstreamService:
             UpstreamModule.MODULE1: config.module1_url,
             UpstreamModule.MODULE2: config.module2_url,
             UpstreamModule.MODULE3: config.module3_url,
+            UpstreamModule.DASHBOARD: config.dashboard_url,
         }
 
     def client_for(self, module: UpstreamModule) -> UpstreamHttpClient:
