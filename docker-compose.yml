@@ -6,6 +6,7 @@ services:
     environment:
       GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
       GATEWAY_ENVIRONMENT: "${GATEWAY_ENVIRONMENT:-local}"
+      DASHBOARD_URL: "http://dashboard-api:${DASHBOARD_PORT:-8004}"
       MODULE1_URL: "${MODULE1_URL:-http://module1-api:8000}"
       MODULE2_URL: "${MODULE2_URL:-http://module2-api:8002}"
       MODULE3_URL: "${MODULE3_URL:-http://module3-api:8000}"
@@ -25,6 +26,8 @@ services:
     networks:
       - pubtube-network
     depends_on:
+      dashboard-api:
+        condition: service_healthy
       otel-collector:
         condition: service_started
     healthcheck:
@@ -41,14 +44,46 @@ services:
       retries: 5
       start_period: 5s
 
+  dashboard-api:
+    build:
+      context: ./dashboard-api
+      dockerfile: Dockerfile
+    environment:
+      DASHBOARD_PORT: "${DASHBOARD_PORT:-8004}"
+      DASHBOARD_ENVIRONMENT: "${GATEWAY_ENVIRONMENT:-local}"
+      OTEL_SERVICE_NAME: module4-dashboard
+      OTEL_TRACES_EXPORTER: "${OTEL_TRACES_EXPORTER:-otlp}"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://otel-collector:4318/v1/traces}"
+    expose:
+      - "${DASHBOARD_PORT:-8004}"
+    networks:
+      - pubtube-network
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          port = os.environ['DASHBOARD_PORT'];
+          urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   prometheus:
     image: prom/prometheus:v3.5.0
     entrypoint:
       - /bin/sh
       - -c
-      - 'sed "s/__GATEWAY_PORT__/$${GATEWAY_PORT}/g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml'
+      - 'sed -e "s/__GATEWAY_PORT__/$${GATEWAY_PORT}/g" -e "s/__DASHBOARD_PORT__/$${DASHBOARD_PORT}/g" /etc/prometheus/prometheus.yml.template > /tmp/prometheus.yml && exec /bin/prometheus --config.file=/tmp/prometheus.yml'
     environment:
       GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
+      DASHBOARD_PORT: "${DASHBOARD_PORT:-8004}"
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
