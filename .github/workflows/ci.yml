@@ -10,13 +10,20 @@ permissions:
 
 jobs:
   python:
-    name: Lint, test and build
+    name: Lint, test and build (${{ matrix.service }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: gateway
+            source: app
+          - service: dashboard-api
+            source: dashboard_app
     env:
-      PYTHONPATH: ${{ github.workspace }}/gateway
+      PYTHONPATH: ${{ github.workspace }}/${{ matrix.service }}
     defaults:
       run:
-        working-directory: gateway
+        working-directory: ${{ matrix.service }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,24 +33,39 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: gateway/requirements-dev.txt
+          cache-dependency-path: ${{ matrix.service }}/requirements-dev.txt
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
 
       - name: Lint
-        run: ruff check --select E4,E7,E9,F app tests
+        run: ruff check --select E4,E7,E9,F ${{ matrix.source }} tests
 
-      - name: Test Gateway including dashboard aggregation and API
+      - name: Test service
         run: pytest -q tests
 
       - name: Build Python sources
-        run: python -m compileall -q app
+        run: python -m compileall -q ${{ matrix.source }}
+
+  integration:
+    name: Gateway and Dashboard integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r gateway/requirements-dev.txt -r dashboard-api/requirements-dev.txt
+      - name: Test public Dashboard through Gateway
+        run: python -m pytest -q integration/tests
 
   docker:
     name: Validate Compose and build Docker image
     runs-on: ubuntu-latest
-    needs: python
+    needs: [python, integration]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,6 +97,9 @@ jobs:
       - name: Build gateway image
         run: docker build --tag pubtube-gateway:ci ./gateway
 
+      - name: Build dashboard image
+        run: docker build --tag pubtube-dashboard:ci ./dashboard-api
+
       - name: Smoke test observability (default ports)
         run: ./scripts/ci/smoke-observability.sh
 
@@ -102,15 +127,22 @@ jobs:
         run: docker compose down --volumes --remove-orphans || true
 
   publish-develop:
-    name: Publish Gateway image to GHCR
+    name: Publish service image to GHCR (${{ matrix.service }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: gateway
+            tag: develop
+          - service: dashboard-api
+            tag: dashboard-develop
     needs: docker
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     permissions:
       contents: read
       packages: write
     concurrency:
-      group: publish-develop
+      group: publish-develop-${{ matrix.service }}
       cancel-in-progress: false
     steps:
       - name: Checkout
@@ -132,8 +164,8 @@ jobs:
       - name: Build and publish develop for amd64 and arm64
         uses: docker/build-push-action@v6
         with:
-          context: ./gateway
+          context: ./${{ matrix.service }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/tilininsano312/pubtube-mod4:develop
+          tags: ghcr.io/tilininsano312/pubtube-mod4:${{ matrix.tag }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
