@@ -1,10 +1,10 @@
 # Acceso de equipos a logs de la VPS
 
 El Compose de producción incluye Dozzle para que cada equipo consulte en vivo
-los logs de su API. Dozzle no recibe el socket Docker directamente: se conecta
-a `docker-socket-proxy`, que solo permite listar contenedores, leer logs,
-recibir eventos y consultar información del daemon. Las acciones y la shell de
-Dozzle están deshabilitadas.
+los logs de su API y del Gateway. Dozzle no recibe el socket Docker
+directamente: se conecta a `docker-socket-proxy`, que solo permite listar
+contenedores, leer logs, recibir eventos y consultar información del daemon.
+Las acciones y la shell de Dozzle están deshabilitadas.
 
 ## Preparación en la VPS
 
@@ -15,15 +15,15 @@ cd /opt/pubtube-mod4
 install -d -m 700 secrets
 docker run --rm -it amir20/dozzle:v11.3.0 generate modulo1 \
   --name "Equipo M1" \
-  --user-filter "label=pubtube.logs.module=module1" \
+  --user-filter "label=pubtube.logs.module1" \
   --user-roles none > /tmp/dozzle-m1.yml
 docker run --rm -it amir20/dozzle:v11.3.0 generate modulo2 \
   --name "Equipo M2" \
-  --user-filter "label=pubtube.logs.module=module2" \
+  --user-filter "label=pubtube.logs.module2" \
   --user-roles none > /tmp/dozzle-m2.yml
 docker run --rm -it amir20/dozzle:v11.3.0 generate modulo3 \
   --name "Equipo M3" \
-  --user-filter "label=pubtube.logs.module=module3" \
+  --user-filter "label=pubtube.logs.module3" \
   --user-roles none > /tmp/dozzle-m3.yml
 ```
 
@@ -37,10 +37,24 @@ chmod 600 /opt/pubtube-mod4/secrets/dozzle_users.yml
 ```
 
 El `filter` de cada usuario es el límite de visibilidad. M1, M2 y M3 solo
-verán los contenedores etiquetados con su propio valor de
-`pubtube.logs.module`; M2 incluye su API y su consumidor de Event Store. Las
-bases, RabbitMQ, Garage, Gateway, WUD y el proxy del socket no aparecen para
-esas cuentas.
+verán los contenedores que tengan su etiqueta de acceso (`pubtube.logs.module1`,
+`pubtube.logs.module2` o `pubtube.logs.module3`). Cada API lleva la etiqueta de
+su módulo; el consumidor de Event Store también lleva la de M2. El Gateway lleva
+las tres para que todos puedan correlacionar la solicitud con los logs de su
+API. Las bases, RabbitMQ, Garage, Dashboard, WUD y el proxy del socket siguen
+fuera de esas cuentas.
+
+Si Dozzle ya está instalado, editar
+`/opt/pubtube-mod4/secrets/dozzle_users.yml` y cambiar únicamente los filtros
+existentes a `label=pubtube.logs.module1`, `label=pubtube.logs.module2` y
+`label=pubtube.logs.module3`, respectivamente. Conservar los hashes de
+contraseña y los roles. Luego desplegar el cambio para recrear los contenedores
+y cargar el archivo actualizado:
+
+```sh
+docker compose -f docker-compose.prod.yml up -d --force-recreate \
+  gateway module1-api module2-api module2-event-store module3-api dozzle
+```
 
 ## Arranque
 
@@ -106,7 +120,11 @@ no publica el puerto 2375 al host.
 
 ## Correlación de errores
 
-Los equipos deben enviar un `X-Correlation-Id` al probar el Gateway y compartir
-ese valor junto con la hora UTC. Así pueden buscar la misma solicitud en los
-logs del Gateway y del módulo. No registrar tokens JWT, contraseñas, URLs con
-credenciales ni contenido sensible en las aplicaciones.
+Los logs del Gateway registran método, ruta, estado, duración e identificadores
+de correlación/traza de las solicitudes de todos los módulos; no registran
+headers, query strings ni cuerpos de las solicitudes. La ruta puede incluir
+identificadores de recursos. Por ser un servicio compartido, todos los equipos
+pueden ver esos metadatos de tráfico de los demás módulos. Para correlacionar
+una solicitud, compartan el `X-Correlation-Id` y la hora UTC de la prueba. No
+registrar tokens JWT, contraseñas, URLs con credenciales ni contenido sensible
+en las aplicaciones.

@@ -3,7 +3,7 @@
 #
 # docker run --rm amir20/dozzle:v11.3.0 generate modulo1 \
 #   --name "Equipo M1" \
-#   --user-filter "label=pubtube.logs.module=module1" \
+#   --user-filter "label=pubtube.logs.module1" \
 #   --user-roles none
 #
 # Repite el comando para modulo2 y modulo3 y combina los tres usuarios bajo
@@ -15,15 +15,15 @@ users:
   modulo1:
     name: Equipo M1
     password: REEMPLAZAR_POR_HASH_BCRYPT
-    filter: label=pubtube.logs.module=module1
+    filter: label=pubtube.logs.module1
     roles: none
   modulo2:
     name: Equipo M2
     password: REEMPLAZAR_POR_HASH_BCRYPT
-    filter: label=pubtube.logs.module=module2
+    filter: label=pubtube.logs.module2
     roles: none
   modulo3:
     name: Equipo M3
     password: REEMPLAZAR_POR_HASH_BCRYPT
-    filter: label=pubtube.logs.module=module3
+    filter: label=pubtube.logs.module3
     roles: none

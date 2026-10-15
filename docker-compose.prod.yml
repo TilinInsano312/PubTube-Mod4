@@ -9,7 +9,7 @@ services:
       wud.watch.digest: "true"
       wud.tag.include: "^develop$"
       wud.trigger.include: dockercompose.local
-      pubtube.logs.module: "module1"
+      pubtube.logs.module1: "true"
     environment:
       NODE_ENV: production
       PORT: "8000"
@@ -160,7 +160,7 @@ services:
       wud.watch.digest: "true"
       wud.tag.include: "^develop$"
       wud.trigger.include: dockercompose.local
-      pubtube.logs.module: "module2"
+      pubtube.logs.module2: "true"
     env_file:
       - ./envsModulos/envmodulo2
     environment:
@@ -192,7 +192,7 @@ services:
       wud.watch.digest: "true"
       wud.tag.include: "^develop$"
       wud.trigger.include: dockercompose.local
-      pubtube.logs.module: "module2"
+      pubtube.logs.module2: "true"
     env_file:
       - ./envsModulos/envmodulo2
     environment:
@@ -218,7 +218,7 @@ services:
     restart: unless-stopped
     labels:
       wud.watch: "false"
-      pubtube.logs.module: "module3"
+      pubtube.logs.module3: "true"
     env_file:
       - ./envsModulos/envmodulo3
     environment:
@@ -264,6 +264,9 @@ services:
       wud.watch.digest: "true"
       wud.tag.include: "^develop$"
       wud.trigger.include: dockercompose.local
+      pubtube.logs.module1: "true"
+      pubtube.logs.module2: "true"
+      pubtube.logs.module3: "true"
     environment:
       GATEWAY_PORT: "${GATEWAY_PORT:-8000}"
       GATEWAY_ENVIRONMENT: "${GATEWAY_ENVIRONMENT:-local}"

@@ -63,6 +63,6 @@ M1, M2 y M3 están definidos en el Compose de producción con bases de datos y b
 
 Durante las pruebas, los Compose permiten acceder a `/api/content/...`, `/api/events/...` y `/api/publish/...` sin JWT mediante `GATEWAY_PUBLIC_TEST_ROUTES=true`. Al terminar, poner esa variable en `false` en el `.env` de la VPS y recrear el Gateway.
 
-Para que M1, M2 y M3 consulten sus logs de la VPS hay un visor Dozzle con cuentas filtradas por módulo. La configuración y el procedimiento de alta están en [`docs/log-access.md`](docs/log-access.md).
+Para que M1, M2 y M3 consulten los logs de sus APIs y del Gateway en la VPS hay un visor Dozzle con cuentas filtradas por módulo. La configuración y el procedimiento de alta están en [`docs/log-access.md`](docs/log-access.md).
 
 Las decisiones de arquitectura vigentes están registradas en [`adr/`](adr/): [pipeline CI/CD](adr/ADR-0007-pipeline-github-actions-ghcr.md), [despliegue en la VPS](adr/ADR-0008-despliegue-vps-compose-wud.md) y [acceso filtrado a logs](adr/ADR-0009-acceso-logs-dozzle.md).
