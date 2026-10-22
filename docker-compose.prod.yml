@@ -210,9 +210,9 @@ services:
       - module2-internal
 
   module3-api:
-    # La imagen :develop de M3 aún no publica arm64; construir en la VPS arm64.
+    # La imagen de M3 aún no publica arm64; construir su rama dev en la VPS.
     build:
-      context: https://github.com/NahuelCatrileo/DPMod3-2026.git#develop
+      context: https://github.com/NahuelCatrileo/DPMod3-2026.git#dev
       dockerfile: Dockerfile
     image: pubtube-module3:local
     restart: unless-stopped
@@ -224,6 +224,19 @@ services:
     environment:
       APP_ENV: prod
       PORT: "8000"
+      JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
+      JWT_AUDIENCE: ""
+    secrets:
+      - jwt_secret
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        export JWT_SECRET_KEY="$$(cat /run/secrets/jwt_secret)"
+        test -n "$${JWT_SECRET_KEY}"
+        alembic upgrade head
+        exec uvicorn app.main:app --host 0.0.0.0 --port "$${PORT}"
     depends_on:
       module3-db:
         condition: service_healthy
@@ -276,7 +289,7 @@ services:
       MODULE3_URL: "${MODULE3_URL:-http://module3-api:8000}"
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       JWT_ALGORITHM: "${JWT_ALGORITHM:-HS256}"
-      GATEWAY_PUBLIC_TEST_ROUTES: "${GATEWAY_PUBLIC_TEST_ROUTES:-true}"
+      GATEWAY_PUBLIC_TEST_ROUTES: "${GATEWAY_PUBLIC_TEST_ROUTES:-false}"
       RATE_LIMIT_REQUESTS: "${RATE_LIMIT_REQUESTS:-60}"
       RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-60}"
       TRUSTED_PROXY_IPS: "${TRUSTED_PROXY_IPS:-}"

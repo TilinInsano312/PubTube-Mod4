@@ -62,6 +62,17 @@ def routing_client(
                 headers={"X-Upstream-Error": "true"},
                 request=request,
             )
+        if request.url.path == "/api/auth/token":
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "module3-issued-jwt",
+                    "token_type": "Bearer",
+                    "expires_in": 1800,
+                },
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                request=request,
+            )
         if request.url.params.get("failure") == "cookies":
             return httpx.Response(
                 200,
@@ -342,6 +353,27 @@ def test_module_route_requires_jwt_before_calling_upstream(
 
     assert response.status_code == 401
     assert observed == []
+
+
+def test_module3_token_endpoint_is_public_and_forwards_client_credentials(
+    routing_client: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, observed = routing_client
+
+    response = client.post(
+        "/api/auth/token",
+        data={"grant_type": "client_credentials"},
+        auth=("service-client", "private-client-secret"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["access_token"] == "module3-issued-jwt"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Pragma"] == "no-cache"
+    assert len(observed) == 1
+    assert str(observed[0].url) == "http://module3.test/api/auth/token"
+    assert observed[0].headers["Authorization"].startswith("Basic ")
+    assert observed[0].content == b"grant_type=client_credentials"
 
 
 def test_health_route_remains_a_local_module4_route(

@@ -11,6 +11,18 @@ from .proxy import proxy_request, quote_path_segment
 router = APIRouter(tags=["module3"])
 
 
+@router.post("/auth/token")
+async def issue_module3_token(
+    request: Request,
+    upstream_service: UpstreamService = Depends(get_upstream_service),
+) -> Response:
+    """Forward client credentials to Module 3's JWT issuer."""
+
+    return await proxy_request(
+        request, upstream_service, UpstreamModule.MODULE3, "/api/auth/token"
+    )
+
+
 @router.get("/publish/health")
 async def module3_health(
     request: Request,
@@ -18,7 +30,9 @@ async def module3_health(
 ) -> Response:
     """Forward a Gateway smoke check to Module 3's health endpoint."""
 
-    return await proxy_request(request, upstream_service, UpstreamModule.MODULE3, "/health")
+    return await proxy_request(
+        request, upstream_service, UpstreamModule.MODULE3, "/health"
+    )
 
 
 @router.post("/publish/schedule")
