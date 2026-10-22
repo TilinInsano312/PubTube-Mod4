@@ -196,3 +196,10 @@ def test_test_mode_does_not_open_other_routes_or_override_disabled_mode(
     monkeypatch.setattr(settings, "public_test_routes", public_test_routes)
     response = TestClient(app).get(path)
     assert response.status_code == 401
+
+
+def test_only_token_issuance_path_bypasses_jwt() -> None:
+    client = TestClient(app)
+
+    assert client.post("/api/auth/token/extra").status_code == 401
+    assert client.get("/api/auth/other").status_code == 401

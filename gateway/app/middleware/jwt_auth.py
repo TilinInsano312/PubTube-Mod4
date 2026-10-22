@@ -16,6 +16,7 @@ PUBLIC_PATHS = frozenset(
         "/api/health/",
         "/api/dashboard",
         "/api/dashboard/",
+        "/api/auth/token",
         "/docs",
         "/docs/oauth2-redirect",
         "/redoc",

@@ -53,7 +53,7 @@ Cada push a `develop` ejecuta CI y, si pasa, publica las imágenes
 `ghcr.io/tilininsano312/pubtube-mod4:dashboard-develop` (Dashboard) con el
 `GITHUB_TOKEN` del workflow. La VPS usa [docker-compose.prod.yml](docker-compose.prod.yml)
 y WUD para actualizar cada servicio cuando cambia su digest. El secreto JWT
-se crea y conserva únicamente en la VPS y solo se monta en el Gateway. La
+se crea y conserva únicamente en la VPS y se monta en el Gateway y M3. La
 instalación y los pasos pendientes para M1/M2/M3 están en
 [la guía de integración](docs/module-integration.md).
 
@@ -61,7 +61,7 @@ instalación y los pasos pendientes para M1/M2/M3 están en
 
 M1, M2 y M3 están definidos en el Compose de producción con bases de datos y broker privados. Antes del primer arranque hay que configurar los entornos privados en la VPS, ejecutar la migración Drizzle de M1 y luego levantar el stack. M3 se construye en la VPS porque su imagen pública aún carece de arm64. Los comandos, la topología y las rutas públicas están en [`docs/module-integration.md`](docs/module-integration.md). La plantilla de smoke test es [`examples/module-gateway-ci.yml`](examples/module-gateway-ci.yml).
 
-Durante las pruebas, los Compose permiten acceder a `/api/content/...`, `/api/events/...` y `/api/publish/...` sin JWT mediante `GATEWAY_PUBLIC_TEST_ROUTES=true`. Al terminar, poner esa variable en `false` en el `.env` de la VPS y recrear el Gateway.
+El Compose de producción valida JWT en `/api/content/...`, `/api/events/...` y `/api/publish/...` por defecto. M3 entrega tokens en `POST /api/auth/token` mediante credenciales de cliente registradas en `AUTH_CLIENTS`. Para pruebas temporales del Gateway se puede activar `GATEWAY_PUBLIC_TEST_ROUTES=true`; M3 seguirá validando JWT en sus rutas de publicación. Al terminar, poner esa variable en `false` en el `.env` de la VPS y recrear el Gateway.
 
 Para que M1, M2 y M3 consulten los logs de sus APIs y del Gateway en la VPS hay un visor Dozzle con cuentas filtradas por módulo. La configuración y el procedimiento de alta están en [`docs/log-access.md`](docs/log-access.md).
 
